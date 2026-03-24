@@ -154,10 +154,7 @@ const FONT_8x8 = (() => {
 //  SECTION 2: FONT RENDERING (direct to fb)
 // ============================================================
 
-// Pack RGBA into uint32 matching fb format
-function packRGBA(r, g, b, a) {
-  return (a << 24) | (b << 16) | (g << 8) | r;
-}
+// packRGBA is defined in ppu.js — reuse it
 
 const MENU_WHITE  = packRGBA(255, 255, 255, 255);
 const MENU_SHADOW = packRGBA(0, 0, 0, 255);

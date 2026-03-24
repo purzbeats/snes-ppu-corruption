@@ -17,8 +17,17 @@ body {
 canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
   width: 1024px;
   height: 896px;
+}
+/* Fullscreen: canvas fills the screen, stays centered */
+:fullscreen canvas,
+:-webkit-full-screen canvas {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 #ui {
   position: fixed;
@@ -45,8 +54,8 @@ canvas {
 </head>
 <body>
 <div id="ui"></div>
-<div id="controls">
-  [SPACE] glitch burst &nbsp; [N/P] next/prev scene &nbsp; [A] auto-advance &nbsp;
+<div id="controls" style="display:none">
+  [H] hide HUD &nbsp; [ENTER] fullscreen &nbsp; [SPACE] glitch burst &nbsp; [N/P] next/prev scene &nbsp; [A] auto-advance &nbsp;
   [T] tile morph &nbsp; [1-9] lock glitch &nbsp; [0] auto<br>
   [G] ghost &nbsp; [W] window &nbsp; [M] mode 7 &nbsp;
   [R] reset &nbsp; [F] freeze &nbsp; [S] screenshot

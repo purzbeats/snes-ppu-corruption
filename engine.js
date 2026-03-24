@@ -28,7 +28,7 @@ let colorCycleRanges = [];
 
 // --- Raster Bars ---
 let rasterEnabled = false;
-let rasterColors = new Uint16Array(SCREEN_H);
+let rasterColors = new Uint16Array(1024); // max possible height
 let rasterOffset = 0;
 
 // --- Scene Director ---
@@ -208,8 +208,8 @@ function initParticles(count, style) {
     const p = { x: 0, y: 0, vx: 0, vy: 0, tile: 0, palette: 0, life: 0, maxLife: 120, size: 8 };
     switch (style) {
       case "scatter":
-        p.x = glitchRand() * 256;
-        p.y = glitchRand() * 224;
+        p.x = glitchRand() * SCREEN_W;
+        p.y = glitchRand() * SCREEN_H;
         p.vx = (glitchRand() - 0.5) * 2;
         p.vy = (glitchRand() - 0.5) * 2;
         p.tile = glitchRandInt(256);
@@ -218,8 +218,8 @@ function initParticles(count, style) {
         p.maxLife = 180 + glitchRandInt(200);
         break;
       case "rain":
-        p.x = glitchRand() * 256;
-        p.y = -8 - glitchRand() * 224;
+        p.x = glitchRand() * SCREEN_W;
+        p.y = -8 - glitchRand() * SCREEN_H;
         p.vx = (glitchRand() - 0.5) * 0.5;
         p.vy = 1 + glitchRand() * 3;
         p.tile = glitchRandInt(64);
@@ -230,8 +230,8 @@ function initParticles(count, style) {
       case "orbit":
         const angle = (i / count) * Math.PI * 2;
         const radius = 40 + glitchRand() * 60;
-        p.x = 128 + Math.cos(angle) * radius;
-        p.y = 112 + Math.sin(angle) * radius;
+        p.x = Math.floor(SCREEN_W / 2) + Math.cos(angle) * radius;
+        p.y = Math.floor(SCREEN_H / 2) + Math.sin(angle) * radius;
         p.vx = -Math.sin(angle) * 0.375;
         p.vy = Math.cos(angle) * 0.375;
         p.tile = i * 4;
@@ -240,8 +240,8 @@ function initParticles(count, style) {
         p.maxLife = 9999;
         break;
       case "rise":
-        p.x = glitchRand() * 256;
-        p.y = 224 + glitchRand() * 100;
+        p.x = glitchRand() * SCREEN_W;
+        p.y = SCREEN_H + glitchRand() * 100;
         p.vx = (glitchRand() - 0.5) * 0.8;
         p.vy = -(0.3 + glitchRand() * 1.5);
         p.tile = glitchRandInt(128);
@@ -262,14 +262,14 @@ function updateParticles() {
     p.life++;
 
     // Wrap around screen
-    if (p.x < -16) p.x += 288;
-    if (p.x > 272) p.x -= 288;
+    if (p.x < -16) p.x += SCREEN_W + 32;
+    if (p.x > SCREEN_W + 16) p.x -= SCREEN_W + 32;
 
     // Respawn if dead or off screen
-    if (p.life > p.maxLife || p.y > 240 || p.y < -20) {
+    if (p.life > p.maxLife || p.y > SCREEN_H + 16 || p.y < -20) {
       p.life = 0;
-      p.y = p.vy > 0 ? -8 : 232;
-      p.x = glitchRand() * 256;
+      p.y = p.vy > 0 ? -8 : SCREEN_H + 8;
+      p.x = glitchRand() * SCREEN_W;
       p.tile = (p.tile + glitchRandInt(8)) & 0xFF;
     }
   }
@@ -315,14 +315,14 @@ function renderSpriteScanline(scanline, lineBuffer, priorityBuffer) {
 
     const spriteY = (scanline - y) & 0xFF;
     if (spriteY >= size) continue;
-    if (x <= -size || x >= 256) continue;
+    if (x <= -size || x >= SCREEN_W) continue;
 
     spritesOnLine++;
     const py = vFlip ? (size - 1 - spriteY) : spriteY;
 
     for (let px = 0; px < size; px++) {
       const screenX = x + px;
-      if (screenX < 0 || screenX >= 256) continue;
+      if (screenX < 0 || screenX >= SCREEN_W) continue;
 
       const tx = hFlip ? (size - 1 - px) : px;
       let subTile = tileIdx;
@@ -607,8 +607,8 @@ function glitchSpriteCorrupt() {
       const count = 4 + glitchRandInt(16);
       for (let i = 0; i < count; i++) {
         const idx = glitchRandInt(128) * 4;
-        OAM[idx] = glitchRandInt(256);
-        OAM[idx + 1] = glitchRandInt(224);
+        OAM[idx] = glitchRandInt(SCREEN_W) & 0xFF;
+        OAM[idx + 1] = glitchRandInt(SCREEN_H) & 0xFF;
       }
       break;
     }
@@ -647,28 +647,29 @@ function glitchWindow() {
     windowMode = 1 + glitchRandInt(5);
   }
 
+  const cx = SCREEN_W >> 1;
   const mode = glitchRandInt(5);
   switch (mode) {
     case 0: // Shift window boundaries
-      window1Left = (window1Left + glitchRandInt(20) - 10 + 256) & 0xFF;
-      window1Right = (window1Right + glitchRandInt(20) - 10 + 256) & 0xFF;
+      window1Left = Math.max(0, Math.min(SCREEN_W - 1, window1Left + glitchRandInt(20) - 10));
+      window1Right = Math.max(0, Math.min(SCREEN_W - 1, window1Right + glitchRandInt(20) - 10));
       break;
     case 1: // Oscillate
-      window1Left = Math.floor(128 + Math.sin(frameCount * 0.03) * 80);
-      window1Right = Math.floor(128 + Math.cos(frameCount * 0.02) * 80);
+      window1Left = Math.floor(cx + Math.sin(frameCount * 0.03) * (cx * 0.6));
+      window1Right = Math.floor(cx + Math.cos(frameCount * 0.02) * (cx * 0.6));
       break;
     case 2: // Closing iris
-      const w = Math.floor(Math.abs(Math.sin(frameCount * 0.01)) * 128);
-      window1Left = 128 - w;
-      window1Right = 128 + w;
+      const w = Math.floor(Math.abs(Math.sin(frameCount * 0.01)) * cx);
+      window1Left = cx - w;
+      window1Right = cx + w;
       break;
     case 3: // Swap window mode
       windowMode = 1 + glitchRandInt(5);
       windowMaskAction = glitchRandInt(3);
       break;
     case 4: // Double window
-      window2Left = glitchRandInt(128);
-      window2Right = 128 + glitchRandInt(128);
+      window2Left = glitchRandInt(cx);
+      window2Right = cx + glitchRandInt(cx);
       windowMode = 3 + glitchRandInt(3); // AND, XOR, or OR
       break;
   }
@@ -879,8 +880,8 @@ const scenes = [
       initParticles(32, "scatter");
       windowEnabled = true;
       windowMode = 4; // XOR
-      window1Left = 64; window1Right = 192;
-      window2Left = 32; window2Right = 224;
+      window1Left = SCREEN_W >> 2; window1Right = (SCREEN_W * 3) >> 2;
+      window2Left = SCREEN_W >> 3; window2Right = (SCREEN_W * 7) >> 3;
       windowMaskAction = 2; // invert
       ghostEnabled = true;
       ghostAlpha = 0.15;
@@ -896,10 +897,11 @@ const scenes = [
       if (localFrame % 4 === 0) bgScrollY[1] += 1;
 
       // Oscillate windows
-      window1Left = Math.floor(128 + Math.sin(localFrame * 0.00375) * 96);
-      window1Right = Math.floor(128 + Math.cos(localFrame * 0.003) * 96);
-      window2Left = Math.floor(128 + Math.sin(localFrame * 0.002 + 2) * 80);
-      window2Right = Math.floor(128 + Math.cos(localFrame * 0.0025 + 1) * 80);
+      const scx = SCREEN_W >> 1;
+      window1Left = Math.floor(scx + Math.sin(localFrame * 0.00375) * (scx * 0.75));
+      window1Right = Math.floor(scx + Math.cos(localFrame * 0.003) * (scx * 0.75));
+      window2Left = Math.floor(scx + Math.sin(localFrame * 0.002 + 2) * (scx * 0.6));
+      window2Right = Math.floor(scx + Math.cos(localFrame * 0.0025 + 1) * (scx * 0.6));
 
       updateParticles();
 
@@ -931,7 +933,7 @@ const scenes = [
       colorMathMode = 1;
       fixedColor = { r: 4, g: 2, b: 8 };
       m7a = 1; m7b = 0; m7c = 0; m7d = 1;
-      m7x = 128; m7y = 112;
+      m7x = SCREEN_W >> 1; m7y = SCREEN_H >> 1;
       m7hofs = 0; m7vofs = 0;
 
       // HDMA for Mode 7 perspective floor
@@ -1022,7 +1024,7 @@ const scenes = [
       windowEnabled = true;
       windowMode = 1;
       windowMaskAction = 0;
-      window1Left = 0; window1Right = 255;
+      window1Left = 0; window1Right = SCREEN_W - 1;
       ghostEnabled = false;
       colorMathMode = 2; // subtract
       fixedColor = { r: 2, g: 2, b: 2 };
@@ -1058,7 +1060,7 @@ const scenes = [
 
       // Window slowly reveals/conceals columns
       window1Left = Math.floor(Math.abs(Math.sin(localFrame * 0.0015)) * 128);
-      window1Right = 255 - window1Left;
+      window1Right = (SCREEN_W - 1) - window1Left;
 
       // Tiles crumble via DMA misfire
       if (localFrame % 12 === 0) glitchDMAMisfire();
@@ -1115,10 +1117,11 @@ const scenes = [
       if (localFrame % 25 === 0) glitchHDMA();
 
       // Window chaos
-      window1Left = Math.floor(128 + Math.sin(localFrame * 0.0125) * 120);
-      window1Right = Math.floor(128 + Math.cos(localFrame * 0.01) * 120);
-      window2Left = Math.floor(128 + Math.sin(localFrame * 0.0075 + 1) * 100);
-      window2Right = Math.floor(128 + Math.cos(localFrame * 0.00875 + 2) * 100);
+      const wcx = SCREEN_W >> 1;
+      window1Left = Math.floor(wcx + Math.sin(localFrame * 0.0125) * (wcx * 0.9));
+      window1Right = Math.floor(wcx + Math.cos(localFrame * 0.01) * (wcx * 0.9));
+      window2Left = Math.floor(wcx + Math.sin(localFrame * 0.0075 + 1) * (wcx * 0.75));
+      window2Right = Math.floor(wcx + Math.cos(localFrame * 0.00875 + 2) * (wcx * 0.75));
     }
   },
 
@@ -1404,6 +1407,19 @@ document.addEventListener("keydown", (e) => {
         link.click();
       }
       break;
+    case "h":
+    case "H":
+      hudVisible = !hudVisible;
+      break;
+    case "Enter":
+    case "F11":
+      e.preventDefault();
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        exitFullscreen();
+      } else {
+        enterFullscreen();
+      }
+      break;
   }
 });
 
@@ -1411,7 +1427,17 @@ document.addEventListener("keydown", (e) => {
 //  SECTION 12: ENHANCED UI
 // ============================================================
 
+let hudVisible = false;
+
 function updateUI() {
+  if (!hudVisible) {
+    ui.innerHTML = "";
+    document.getElementById("controls").style.display = "none";
+    return;
+  }
+
+  document.getElementById("controls").style.display = "";
+
   const modeStr = ppuMode === 7 ? "MODE 7" : `MODE ${ppuMode}`;
   const glitchStr = glitchMode === 0 ? "AUTO" : (GLITCH_NAMES[glitchMode - 1] || "AUTO");
   const activeStr = activeGlitchNames.slice(0, 4).join(" + ") || "—";
@@ -1447,7 +1473,7 @@ function updateUI() {
     <div style="color:#666">────────────────────────────</div>
     <div>Scene: <span style="color:#8ff">${sceneName}</span> [${sceneBar}] ${sceneAutoAdvance ? "AUTO" : "MANUAL"}</div>
     ${transStr}
-    <div>${modeStr} │ F${frameCount} │ ${frozen ? "FROZEN" : "LIVE"}</div>
+    <div>${modeStr} │ ${SCREEN_W}×${SCREEN_H} │ F${frameCount} │ ${frozen ? "FROZEN" : "LIVE"}</div>
     <div>Intensity: [${intensityBar}]</div>
     <div style="color:#666">${activeStr}</div>
     <div style="color:#555">${featStr}</div>
@@ -1500,7 +1526,93 @@ function mainLoop() {
 }
 
 // ============================================================
-//  SECTION 14: BOOT SEQUENCE
+//  SECTION 14: FULLSCREEN + ADAPTIVE RESOLUTION
+// ============================================================
+
+let isFullscreen = false;
+
+function calculateSNESResolution() {
+  // Figure out how many SNES-sized pixels fill the screen
+  // Use integer scaling based on screen height, extend width to fill aspect ratio
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+
+  // Integer scale factor that fills the height
+  const scale = Math.max(1, Math.floor(screenH / SNES_H));
+
+  // How many SNES pixels we need at this scale to fill the screen
+  const snesW = Math.ceil(screenW / scale);
+  const snesH = Math.ceil(screenH / scale);
+
+  return { snesW, snesH, scale };
+}
+
+function enterFullscreen() {
+  const el = document.documentElement;
+  const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  if (rfs) rfs.call(el);
+}
+
+function exitFullscreen() {
+  const efs = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+  if (efs) efs.call(document);
+}
+
+function applyFullscreenResolution() {
+  const { snesW, snesH, scale } = calculateSNESResolution();
+
+  // Resize the PPU framebuffer to the new resolution
+  resizePPU(snesW, snesH);
+
+  // Size the canvas via CSS to fill screen with integer pixel scaling
+  canvas.style.width = (snesW * scale) + "px";
+  canvas.style.height = (snesH * scale) + "px";
+
+  // Regenerate raster bars for new height
+  if (rasterEnabled) {
+    // Re-run whatever raster style the current scene uses
+    // (the scene setup will handle this on next transition)
+  }
+
+  // Reset ghost buffer for new size
+  ghostBuffer = null;
+
+  isFullscreen = true;
+}
+
+function applyWindowedResolution() {
+  resizePPU(SNES_W, SNES_H);
+  canvas.style.width = "1024px";
+  canvas.style.height = "896px";
+  ghostBuffer = null;
+  isFullscreen = false;
+}
+
+// Listen for fullscreen changes (ESC exits fullscreen via browser)
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement) {
+    applyFullscreenResolution();
+  } else {
+    applyWindowedResolution();
+  }
+});
+document.addEventListener("webkitfullscreenchange", () => {
+  if (document.webkitFullscreenElement) {
+    applyFullscreenResolution();
+  } else {
+    applyWindowedResolution();
+  }
+});
+
+// Handle window resize while in fullscreen
+window.addEventListener("resize", () => {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    applyFullscreenResolution();
+  }
+});
+
+// ============================================================
+//  SECTION 15: BOOT SEQUENCE
 // ============================================================
 
 // Push new glitch types into the dispatcher

@@ -13,12 +13,14 @@
 
 // Global scope — engine.js extends this
 
-// --- SNES constants ---
-const SCREEN_W = 256;
-const SCREEN_H = 224;
+// --- SNES constants (W/H are mutable for fullscreen extended rendering) ---
+let SCREEN_W = 256;
+let SCREEN_H = 224;
+const SNES_W = 256; // native SNES width (for reference)
+const SNES_H = 224; // native SNES height
 const TILE_SIZE = 8;
-const TILES_PER_ROW = SCREEN_W / TILE_SIZE; // 32
-const TILES_PER_COL = SCREEN_H / TILE_SIZE; // 28
+let TILES_PER_ROW = SCREEN_W / TILE_SIZE; // 32
+let TILES_PER_COL = SCREEN_H / TILE_SIZE; // 28
 const VRAM_SIZE = 0x10000;   // 64KB VRAM (word-addressed, but we use bytes)
 const CGRAM_SIZE = 512;       // 256 colors × 2 bytes (15-bit BGR)
 const OAM_SIZE = 544;         // 128 sprites × 4 bytes + 32 bytes high table
@@ -27,9 +29,21 @@ const TILEMAP_SIZE = 0x800;   // 2KB per tilemap (32×32 entries × 2 bytes)
 // --- Canvas setup ---
 const canvas = document.getElementById("screen");
 const ctx = canvas.getContext("2d");
-const imgData = ctx.createImageData(SCREEN_W, SCREEN_H);
-const fb = new Uint32Array(imgData.data.buffer); // framebuffer as packed RGBA
+let imgData = ctx.createImageData(SCREEN_W, SCREEN_H);
+let fb = new Uint32Array(imgData.data.buffer); // framebuffer as packed RGBA
 const ui = document.getElementById("ui");
+
+// --- Resize the PPU framebuffer (called by engine.js for fullscreen) ---
+function resizePPU(w, h) {
+  SCREEN_W = w;
+  SCREEN_H = h;
+  TILES_PER_ROW = Math.ceil(w / TILE_SIZE);
+  TILES_PER_COL = Math.ceil(h / TILE_SIZE);
+  canvas.width = w;
+  canvas.height = h;
+  imgData = ctx.createImageData(w, h);
+  fb = new Uint32Array(imgData.data.buffer);
+}
 
 // --- PPU State ---
 // All memory as typed arrays to mirror real hardware
@@ -302,8 +316,8 @@ function hslToRGB(h, s, l) {
 function generateOAM() {
   for (let i = 0; i < 128; i++) {
     const base = i * 4;
-    OAM[base + 0] = Math.floor(Math.random() * 256); // X
-    OAM[base + 1] = Math.floor(Math.random() * 224); // Y
+    OAM[base + 0] = Math.floor(Math.random() * SCREEN_W) & 0xFF; // X
+    OAM[base + 1] = Math.floor(Math.random() * SCREEN_H) & 0xFF; // Y
     OAM[base + 2] = Math.floor(Math.random() * 256); // tile index
     // Byte 3: vhoopppc — vflip, hflip, priority(2), palette(3), tile bit9(unused for 4bpp we keep simple)
     OAM[base + 3] = Math.floor(Math.random() * 256);
@@ -1418,7 +1432,7 @@ function resetPPU() {
   colorMathMode = 0;
   m7a = 1; m7b = 0; m7c = 0; m7d = 1;
   m7hofs = 0; m7vofs = 0;
-  m7x = 128; m7y = 112;
+  m7x = SCREEN_W >> 1; m7y = SCREEN_H >> 1;
 
   // Reset tile morph state
   tileMorphPhase = 0;

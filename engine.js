@@ -1622,9 +1622,9 @@ applyFullscreenResolution();
 resetPPU();
 generateEnhancedTiles();
 
-// Start with Scene 0 — run setup directly (transitionToScene skips setup until phase 2)
-currentScene = 0;
-scenes[0].setup();
+// Start with a random scene
+currentScene = Math.floor(Math.random() * scenes.length);
+scenes[currentScene].setup();
 sceneTimer = 0;
 sceneTransitionPhase = 3; // fade in from black
 sceneTransitionTimer = 0;

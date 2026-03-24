@@ -92,18 +92,35 @@ button:disabled { opacity: 0.4; cursor: default; }
     </select>
   </div>
   <div>
+    <label>Resolution:</label>
+    <select id="resolution-select" onchange="applyResolutionPreset()">
+      <option value="custom">Custom</option>
+      <option value="2">SNES 2x (512x448)</option>
+      <option value="3">SNES 3x (768x672)</option>
+      <option value="4" selected>SNES 4x (1024x896)</option>
+      <option value="5">SNES 5x (1280x1120)</option>
+      <option value="6">SNES 6x (1536x1344)</option>
+      <option value="7">SNES 7x (1792x1568)</option>
+      <option value="8">SNES 8x (2048x1792)</option>
+      <option value="10">SNES 10x (2560x2240)</option>
+      <option value="12">SNES 12x (3072x2688)</option>
+      <option value="16">SNES 16x (4096x3584)</option>
+      <option value="1080p">1080p</option>
+      <option value="4k">4K</option>
+    </select>
+    <span style="color:#555;font-size:10px;margin-left:5px" id="res-display">1024x896</span>
+  </div>
+  <div>
     <label>Width:</label>
-    <input type="number" id="render-w" value="256" min="128" max="1920" step="8">
+    <input type="number" id="render-w" value="1024" min="128" max="8192" step="8" onchange="document.getElementById('resolution-select').value='custom';updateResDisplay()">
     <label style="width:auto;margin-left:10px">Height:</label>
-    <input type="number" id="render-h" value="224" min="112" max="1080" step="8">
-    <button onclick="document.getElementById('render-w').value=1920;document.getElementById('render-h').value=1080" style="padding:3px 8px;font-size:10px">1080p</button>
-    <button onclick="document.getElementById('render-w').value=3840;document.getElementById('render-h').value=2160" style="padding:3px 8px;font-size:10px">4K</button>
-    <button onclick="document.getElementById('render-w').value=480;document.getElementById('render-h').value=270" style="padding:3px 8px;font-size:10px">SNES 4x</button>
+    <input type="number" id="render-h" value="896" min="112" max="8192" step="8" onchange="document.getElementById('resolution-select').value='custom';updateResDisplay()">
   </div>
   <div>
     <label>Format:</label>
     <select id="format-select">
-      <option value="webm">WebM video</option>
+      <option value="mp4">MP4 video (H.264)</option>
+      <option value="webm">WebM video (VP9)</option>
       <option value="frames">PNG frames (zip)</option>
     </select>
   </div>
@@ -136,6 +153,29 @@ const OFFLINE_RENDER = true;
 
 let rendering = false;
 let cancelled = false;
+
+// Resolution preset handler
+function applyResolutionPreset() {
+  const val = document.getElementById("resolution-select").value;
+  let w, h;
+  if (val === "custom") return;
+  if (val === "1080p") { w = 1920; h = 1080; }
+  else if (val === "4k") { w = 3840; h = 2160; }
+  else {
+    const scale = parseInt(val);
+    w = 256 * scale;
+    h = 224 * scale;
+  }
+  document.getElementById("render-w").value = w;
+  document.getElementById("render-h").value = h;
+  updateResDisplay();
+}
+
+function updateResDisplay() {
+  const w = document.getElementById("render-w").value;
+  const h = document.getElementById("render-h").value;
+  document.getElementById("res-display").textContent = w + "x" + h;
+}
 
 // Populate scene dropdown
 function populateScenes() {
@@ -240,8 +280,8 @@ async function startRender() {
   setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at ${w}x${h} ${fps}fps...`);
   setProgress(0);
 
-  if (format === "webm") {
-    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h);
+  if (format === "mp4" || format === "webm") {
+    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format);
   } else {
     await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h);
   }
@@ -272,23 +312,68 @@ function renderOneFrame(frameDeltaMs) {
   frameCount++;
 }
 
-// --- WebM video output via MediaRecorder ---
-async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
+// --- Video output via MediaRecorder (MP4 H.264 or WebM VP9) ---
+async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format) {
   const stream = canvas.captureStream(0); // 0 = manual frame capture
   const track = stream.getVideoTracks()[0];
 
-  // Try to get a good codec
-  let mimeType = "video/webm;codecs=vp9";
-  if (!MediaRecorder.isTypeSupported(mimeType)) {
-    mimeType = "video/webm;codecs=vp8";
+  // Pick the best available codec for the requested format
+  let mimeType, fileExt;
+  if (format === "mp4") {
+    // Try H.264 MP4 variants
+    const mp4Types = [
+      "video/mp4;codecs=avc1.640028",   // H.264 High
+      "video/mp4;codecs=avc1.4d0028",   // H.264 Main
+      "video/mp4;codecs=avc1.42e01e",   // H.264 Baseline
+      "video/mp4;codecs=avc1",
+      "video/mp4",
+    ];
+    mimeType = mp4Types.find(t => MediaRecorder.isTypeSupported(t));
+    if (!mimeType) {
+      // Fallback: some browsers support H.264 in WebM container
+      const fallbacks = [
+        "video/webm;codecs=h264",
+        "video/webm;codecs=avc1",
+      ];
+      mimeType = fallbacks.find(t => MediaRecorder.isTypeSupported(t));
+      if (mimeType) {
+        fileExt = "webm"; // H.264 in WebM container
+        setStatus("Note: MP4 not supported, using H.264 in WebM container");
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    if (!mimeType) {
+      // Last resort: fall back to VP9 WebM
+      setStatus("Note: MP4/H.264 not supported in this browser, falling back to WebM VP9");
+      await new Promise(r => setTimeout(r, 1500));
+      format = "webm";
+    } else {
+      fileExt = fileExt || "mp4";
+    }
   }
-  if (!MediaRecorder.isTypeSupported(mimeType)) {
-    mimeType = "video/webm";
+
+  if (format === "webm") {
+    const webmTypes = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+    ];
+    mimeType = webmTypes.find(t => MediaRecorder.isTypeSupported(t));
+    fileExt = "webm";
   }
+
+  if (!mimeType) {
+    setStatus("Error: No supported video codec found in this browser.");
+    return;
+  }
+
+  // High bitrate for quality (~CRF 13 equivalent)
+  // CRF 13 in H.264 is roughly 80-120% of the raw pixel bandwidth
+  const bitrate = Math.max(8000000, w * h * fps * 2);
 
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: Math.max(5000000, w * h * fps * 0.5) // scale bitrate with resolution
+    videoBitsPerSecond: bitrate
   });
 
   const chunks = [];
@@ -297,23 +382,22 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
   const done = new Promise((resolve) => { recorder.onstop = resolve; });
   recorder.start();
 
-  const batchSize = 4; // render N frames then yield to UI
+  const batchSize = 4;
 
   for (let frame = 0; frame < totalFrames; frame++) {
     if (cancelled) break;
 
     renderOneFrame(frameDeltaMs);
 
-    // Request the stream capture a frame
     if (track.requestFrame) {
       track.requestFrame();
     }
 
-    // Yield to UI periodically for progress updates
     if (frame % batchSize === 0) {
       const pct = ((frame / totalFrames) * 100).toFixed(1);
       setProgress(parseFloat(pct));
-      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%)`);
+      const mbEst = ((chunks.reduce((a, c) => a + c.size, 0)) / 1048576).toFixed(1);
+      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%) — ~${mbEst}MB`);
       await new Promise(r => setTimeout(r, 0));
     }
   }
@@ -326,10 +410,11 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `snes_${scenes[sceneIdx].name.toLowerCase().replace(/\s+/g, "_")}_${w}x${h}_${fps}fps.webm`;
+    a.download = `snes_${scenes[sceneIdx].name.toLowerCase().replace(/\s+/g, "_")}_${w}x${h}_${fps}fps.${fileExt}`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus(`Done! ${totalFrames} frames rendered. File downloading.`);
+    const sizeMB = (blob.size / 1048576).toFixed(1);
+    setStatus(`Done! ${totalFrames} frames, ${sizeMB}MB ${fileExt.toUpperCase()}. File downloading.`);
     setProgress(100);
   } else {
     setStatus("Cancelled.");
@@ -462,6 +547,8 @@ async function buildZip(files) {
 // --- Init ---
 populateScenes();
 parseURLParams();
+applyResolutionPreset();
+updateResDisplay();
 
 // Don't auto-start the live engine — just show the UI
 // The user clicks PREVIEW to see live, or RENDER to export

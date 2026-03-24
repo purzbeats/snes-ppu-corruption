@@ -755,7 +755,7 @@ function glitchGhostFrame() {
 //  SECTION 10: SCENE DIRECTOR
 // ============================================================
 
-const SCENE_DURATION = 8640;  // ~2.4 minutes at 60fps
+const SCENE_DURATION = 1200;  // ~20 seconds at 60fps
 const SCENE_TRANSITION_LEN = 150; // ~2.5 second transitions
 
 const scenes = [

@@ -755,7 +755,7 @@ function glitchGhostFrame() {
 //  SECTION 10: SCENE DIRECTOR
 // ============================================================
 
-const SCENE_DURATION_MS = 60000;      // 60 seconds in real time
+const SCENE_DURATION_MS = 20000;      // 20 seconds in real time
 const SCENE_TRANSITION_MS = 1000;     // 1 second transitions in real time
 let lastFrameTime = performance.now(); // for delta-time tracking
 let sceneElapsedMs = 0;               // real-time elapsed in current scene

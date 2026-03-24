@@ -1373,6 +1373,7 @@ document.addEventListener("keydown", (e) => {
         scenes[currentScene].setup();
       }
       sceneTimer = 0;
+      sceneElapsedMs = 0;
       break;
     case "m":
     case "M":
@@ -1654,9 +1655,11 @@ generateEnhancedTiles();
 currentScene = Math.floor(Math.random() * scenes.length);
 scenes[currentScene].setup();
 sceneTimer = 0;
+sceneElapsedMs = 0;
+transitionElapsedMs = 0;
 sceneTransitionPhase = 3; // fade in from black
-sceneTransitionTimer = 0;
 sceneBrightness = 0;
+lastFrameTime = performance.now(); // reset so first delta isn't huge
 
 // GO
 mainLoop();

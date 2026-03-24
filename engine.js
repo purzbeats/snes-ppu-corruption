@@ -1581,10 +1581,8 @@ function applyFullscreenResolution() {
 }
 
 function applyWindowedResolution() {
-  resizePPU(SNES_W, SNES_H);
-  canvas.style.width = "1024px";
-  canvas.style.height = "896px";
-  ghostBuffer = null;
+  // Same logic as fullscreen — always fill the viewport
+  applyFullscreenResolution();
   isFullscreen = false;
 }
 
@@ -1604,11 +1602,9 @@ document.addEventListener("webkitfullscreenchange", () => {
   }
 });
 
-// Handle window resize while in fullscreen
+// Always refill viewport on resize
 window.addEventListener("resize", () => {
-  if (document.fullscreenElement || document.webkitFullscreenElement) {
-    applyFullscreenResolution();
-  }
+  applyFullscreenResolution();
 });
 
 // ============================================================
@@ -1618,6 +1614,9 @@ window.addEventListener("resize", () => {
 // Push new glitch types into the dispatcher
 GLITCH_NAMES.push("Sprite Corrupt", "Window Glitch", "Cycle Desync", "Raster Corrupt", "Ghost Frame");
 GLITCH_FNS.push(glitchSpriteCorrupt, glitchWindow, glitchColorCycleDesync, glitchRasterCorrupt, glitchGhostFrame);
+
+// Fill the viewport immediately
+applyFullscreenResolution();
 
 // Initialize PPU with enhanced tiles
 resetPPU();

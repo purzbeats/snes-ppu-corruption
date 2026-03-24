@@ -513,6 +513,374 @@ function generateVoidTiles() {
     "05777750","05777750","05777750","05777750"]);
 }
 
+// -- Crystal Cavern tiles (6-25) --
+function generateCrystalTiles() {
+  generateSharedTiles();
+  // Override ground to cave stone
+  writeTileStr(T(1), [
+    "55255525","25552555","55255525","25555255",
+    "55525555","25552555","55255552","25555525"]);
+  writeTileStr(T(3), [
+    "00000000","55555555","52525252","25252525",
+    "55255525","25552555","55525555","25555255"]);
+  // 6: Cave wall texture
+  writeTileStr(T(6), [
+    "55255525","25552555","52555255","55255525",
+    "25555255","55252555","25555525","52555255"]);
+  // 7: Stalactite hanging down
+  writeTileStr(T(7), [
+    "55555555","55255555","55525555","55552555",
+    "00552500","00055000","00055000","00005000"]);
+  // 8: Stalactite thin
+  writeTileStr(T(8), [
+    "55555555","55555255","55555525","00555520",
+    "00055500","00005500","00005000","00000000"]);
+  // 9: Crystal cluster tall (color 8,9 = cycling shimmer)
+  writeTileStr(T(9), [
+    "00080000","00880000","08890000","08899000",
+    "88999800","08998000","00890000","00080000"]);
+  // 10: Crystal cluster wide
+  writeTileStr(T(10), [
+    "00000000","00800080","08900890","89908990",
+    "89998999","08990890","00800080","00000000"]);
+  // 11: Stalagmite rising
+  writeTileStr(T(11), [
+    "00005000","00055000","00055000","00552500",
+    "05552550","55255525","55555555","55555555"]);
+  // 12: Stalagmite short
+  writeTileStr(T(12), [
+    "00000000","00000000","00050000","00550000",
+    "00552500","05555500","55555555","55555555"]);
+  // 13: Underground river surface
+  writeTileStr(T(13), [
+    "77877877","78787878","87878787","17171717",
+    "71717171","11711171","17171717","71717171"]);
+  // 14: Underground river deep
+  writeTileStr(T(14), [
+    "11711171","17171717","71717171","11111711",
+    "17171717","71711171","11171717","17171171"]);
+  // 15: Mineral vein (bright streak in wall)
+  writeTileStr(T(15), [
+    "55255525","25589555","55898255","25589525",
+    "55259555","25552555","55255525","25555255"]);
+  // 16: Crystal glow tile (color 8 = cycling)
+  writeTileStr(T(16), [
+    "00000000","00080000","00000800","08000000",
+    "00000008","00800000","00000080","00000000"]);
+  // 17: Cave ceiling texture
+  writeTileStr(T(17), [
+    "55555555","55555555","52555525","55255552",
+    "25555255","55525555","55555555","55555555"]);
+  // 18: Large crystal (left half)
+  writeTileStr(T(18), [
+    "00000800","00008900","00089900","00899900",
+    "08999900","08999000","00890000","00080000"]);
+  // 19: Large crystal (right half)
+  writeTileStr(T(19), [
+    "08000000","09800000","09980000","09998000",
+    "09999800","00999800","00098000","00008000"]);
+  // 20: Dripping water
+  writeTileStr(T(20), [
+    "55555555","55575555","55575555","55570555",
+    "00070000","00070000","00000000","00070000"]);
+  // 21: Cave entrance dark
+  writeTileStr(T(21), [
+    "55555555","52222255","22222225","22222222",
+    "22222222","22222222","52222225","55222255"]);
+  // 22: Gem deposit (color 9,A = cycling)
+  writeTileStr(T(22), [
+    "55255525","259A2555","5A9A5255","259A2525",
+    "55255555","25552555","55255A25","255A5255"]);
+  // 23: Rubble/rocks
+  writeTileStr(T(23), [
+    "00000000","00000000","00550050","05555505",
+    "55555555","55555555","55555555","55555555"]);
+  // 24: Crystal shard small
+  writeTileStr(T(24), [
+    "00000000","00000000","00080000","00890000",
+    "08990000","00890000","00080000","00000000"]);
+  // 25: Phosphorescent moss
+  writeTileStr(T(25), [
+    "00000000","03080300","38383830","03080300",
+    "00303000","30003003","03000030","00000000"]);
+}
+
+// -- Desert Ruins tiles (6-25) --
+function generateDesertTiles() {
+  generateSharedTiles();
+  // Override ground to sand
+  writeTileStr(T(1), [
+    "22622262","26262626","62626262","22622262",
+    "26262626","62626262","22622262","26262626"]);
+  writeTileStr(T(3), [
+    "00000000","22222222","26262626","62626262",
+    "22622262","26262626","62626262","22622262"]);
+  // 6: Sand dune slope left
+  writeTileStr(T(6), [
+    "00000000","00000000","00000002","00000022",
+    "00000226","00002262","00022626","00226262"]);
+  // 7: Sand dune slope right
+  writeTileStr(T(7), [
+    "00000000","00000000","20000000","22000000",
+    "62200000","26220000","62622000","26262200"]);
+  // 8: Sand texture flat
+  writeTileStr(T(8), [
+    "22622262","26262626","62626262","22622262",
+    "26262626","62626262","22622262","26262626"]);
+  // 9: Half-buried column
+  writeTileStr(T(9), [
+    "00555500","00555500","00555500","22555522",
+    "26255262","62225622","22622262","26262626"]);
+  // 10: Crumbling wall
+  writeTileStr(T(10), [
+    "05550555","55555555","55555555","55555555",
+    "55055505","50050050","00000000","00000000"]);
+  // 11: Archway top
+  writeTileStr(T(11), [
+    "55555555","55000055","50000005","00000000",
+    "00000000","00000000","00000000","00000000"]);
+  // 12: Archway pillar
+  writeTileStr(T(12), [
+    "55000055","55000055","55000055","55000055",
+    "55000055","55000055","55000055","55000055"]);
+  // 13: Sphinx body block
+  writeTileStr(T(13), [
+    "55555555","56565656","55555555","56565656",
+    "55555555","56565656","55555555","56565656"]);
+  // 14: Sphinx head
+  writeTileStr(T(14), [
+    "00555500","05666650","56666665","56776765",
+    "56666665","05666650","00566500","00555500"]);
+  // 15: Sphinx headdress
+  writeTileStr(T(15), [
+    "00055000","00555500","05555550","55555555",
+    "65555556","56555565","05555550","55555555"]);
+  // 16: Sun-bleached stone
+  writeTileStr(T(16), [
+    "55755575","57575757","75757575","55755575",
+    "57575757","75757575","55755575","57575757"]);
+  // 17: Scattered stones
+  writeTileStr(T(17), [
+    "00000000","00000000","00550050","05550505",
+    "00550050","00000000","05000000","00000000"]);
+  // 18: Sand ripple (color 8 = cycling shimmer)
+  writeTileStr(T(18), [
+    "82828282","28282828","82828282","28282828",
+    "82828282","28282828","82828282","28282828"]);
+  // 19: Obelisk segment
+  writeTileStr(T(19), [
+    "00566500","00566500","00566500","00566500",
+    "00566500","00566500","00566500","00566500"]);
+  // 20: Obelisk top (pyramid cap)
+  writeTileStr(T(20), [
+    "00000000","00050000","00565000","05665500",
+    "56666550","00566500","00566500","00566500"]);
+  // 21: Sphinx paw
+  writeTileStr(T(21), [
+    "55555555","56565656","55555555","55555555",
+    "22555522","26255262","62226222","22622262"]);
+  // 22: Heat shimmer air (color 8 = cycling)
+  writeTileStr(T(22), [
+    "00000000","80000008","00800080","00080800",
+    "00000000","00800080","08000008","00000000"]);
+  // 23: Hieroglyph wall
+  writeTileStr(T(23), [
+    "55555555","50505050","55555555","50050050",
+    "55555555","50505050","55555555","50050050"]);
+  // 24: Desert sky star
+  writeTileStr(T(24), [
+    "00000000","00070000","00000000","00000007",
+    "07000000","00000000","00000070","00000000"]);
+  // 25: Cactus skeleton
+  writeTileStr(T(25), [
+    "00060000","00060000","06060600","06060600",
+    "06666600","00060000","00060000","00060000"]);
+}
+
+// -- Neon City tiles (6-25) --
+function generateNeonTiles() {
+  generateSharedTiles();
+  // Override ground to street/pavement
+  writeTileStr(T(1), [
+    "22222222","22222222","22222222","22222222",
+    "22222222","22222222","22222222","22222222"]);
+  writeTileStr(T(3), [
+    "55555555","22222222","22222222","22222222",
+    "22222222","22222222","22222222","22222222"]);
+  // 6: Building silhouette solid
+  writeTileStr(T(6), [
+    "11111111","11111111","11111111","11111111",
+    "11111111","11111111","11111111","11111111"]);
+  // 7: Building with windows
+  writeTileStr(T(7), [
+    "11111111","15115111","11111111","11151151",
+    "11111111","15115111","11111111","11151151"]);
+  // 8: Building top flat
+  writeTileStr(T(8), [
+    "00000000","00000000","11111111","11111111",
+    "15115111","11111111","11151151","11111111"]);
+  // 9: Building top antenna
+  writeTileStr(T(9), [
+    "00010000","00010000","00111000","11111111",
+    "11111111","15115111","11111111","11151151"]);
+  // 10: Neon sign block (color 8,9 = cycling neon)
+  writeTileStr(T(10), [
+    "11111111","18899811","89999811","89999811",
+    "18899811","11111111","11111111","11111111"]);
+  // 11: Window grid pattern
+  writeTileStr(T(11), [
+    "15151515","11111111","51515151","11111111",
+    "15151515","11111111","51515151","11111111"]);
+  // 12: Spire/skyscraper top
+  writeTileStr(T(12), [
+    "00010000","00111000","01111100","11111111",
+    "11111111","11111111","11111111","11111111"]);
+  // 13: Street level
+  writeTileStr(T(13), [
+    "55555555","22222222","52525252","22222222",
+    "22222222","22522252","22222222","22222222"]);
+  // 14: Puddle/reflection (color 7,8 = cycling)
+  writeTileStr(T(14), [
+    "22222222","22722272","27878722","28787822",
+    "27878722","22728272","22222222","22222222"]);
+  // 15: Billboard frame
+  writeTileStr(T(15), [
+    "55555555","58888885","58888885","58888885",
+    "58888885","55555555","00110000","00110000"]);
+  // 16: Neon stripe horizontal (color 8,9 = cycling)
+  writeTileStr(T(16), [
+    "00000000","00000000","00000000","88999988",
+    "99888899","00000000","00000000","00000000"]);
+  // 17: Neon stripe vertical (color 8,9 = cycling)
+  writeTileStr(T(17), [
+    "00089000","00089000","00089000","00089000",
+    "00089000","00089000","00089000","00089000"]);
+  // 18: Building narrow
+  writeTileStr(T(18), [
+    "01111110","01511510","01111110","01151150",
+    "01111110","01511510","01111110","01151150"]);
+  // 19: Rooftop detail
+  writeTileStr(T(19), [
+    "00000000","01111110","11111111","11111111",
+    "15115111","11111111","11151151","11111111"]);
+  // 20: Building gap (alley)
+  writeTileStr(T(20), [
+    "11000011","11000011","11000011","11000011",
+    "11000011","11000011","11000011","11000011"]);
+  // 21: Neon sign large (color 8,9,A = cycling)
+  writeTileStr(T(21), [
+    "11111111","1899A811","9AAAA911","9A99A911",
+    "9AAAA911","1899A811","11111111","11111111"]);
+  // 22: Star/sky sparkle
+  writeTileStr(T(22), [
+    "00000000","00050000","00000000","00000005",
+    "05000000","00000000","00000050","00000000"]);
+  // 23: Traffic light
+  writeTileStr(T(23), [
+    "00111000","00191000","00181000","00131000",
+    "00111000","00010000","00010000","00010000"]);
+  // 24: Crane silhouette
+  writeTileStr(T(24), [
+    "11111100","00001100","00001100","00001100",
+    "00001100","00001100","00001100","00001100"]);
+  // 25: Fire escape zigzag
+  writeTileStr(T(25), [
+    "11000011","01100110","00111100","00011000",
+    "00111100","01100110","11000011","10000001"]);
+}
+
+// -- Deep Space tiles (6-25) --
+function generateSpaceTiles() {
+  generateSharedTiles();
+  // Override to empty space (mostly transparent)
+  writeTileStr(T(1), [
+    "00000000","00000000","00000000","00000000",
+    "00000000","00000000","00000000","00000000"]);
+  writeTileStr(T(3), [
+    "00000000","00000000","00000000","00000000",
+    "00000000","00000000","00000000","00000000"]);
+  // 6: Star field sparse
+  writeTileStr(T(6), [
+    "00000000","00070000","00000000","00000007",
+    "07000000","00000000","00000070","00000000"]);
+  // 7: Star field dense
+  writeTileStr(T(7), [
+    "70000007","00070000","00000070","07000000",
+    "00000700","00700000","00000007","70000070"]);
+  // 8: Nebula cloud (color 8,9 = cycling)
+  writeTileStr(T(8), [
+    "00000000","00088000","00899800","08999980",
+    "89999998","08999980","00899800","00088000"]);
+  // 9: Nebula wisp (color 8,9 = cycling)
+  writeTileStr(T(9), [
+    "00000000","00080000","00899000","08998000",
+    "00899000","00080000","00000000","00000000"]);
+  // 10: Planet surface curve top-right
+  writeTileStr(T(10), [
+    "00000000","00000003","00000033","00003344",
+    "00034443","00344434","03444343","34443434"]);
+  // 11: Planet surface curve top-left
+  writeTileStr(T(11), [
+    "00000000","30000000","33000000","44330000",
+    "34430000","43443000","34344300","43434430"]);
+  // 12: Planet surface fill
+  writeTileStr(T(12), [
+    "34434434","44343443","34434434","43343434",
+    "34443443","43434344","34343434","44343443"]);
+  // 13: Planet surface curve bottom-right
+  writeTileStr(T(13), [
+    "34443434","03444343","00344434","00034443",
+    "00003344","00000033","00000003","00000000"]);
+  // 14: Planet surface curve bottom-left
+  writeTileStr(T(14), [
+    "43434430","34344300","43443000","34430000",
+    "44330000","33000000","30000000","00000000"]);
+  // 15: Planet ring segment horizontal
+  writeTileStr(T(15), [
+    "00000000","00000000","00000000","66666666",
+    "55555555","00000000","00000000","00000000"]);
+  // 16: Planet ring segment diagonal rising
+  writeTileStr(T(16), [
+    "00000000","00000066","00006655","00665500",
+    "66550000","55000000","00000000","00000000"]);
+  // 17: Planet ring segment diagonal falling
+  writeTileStr(T(17), [
+    "00000000","66000000","55660000","00556600",
+    "00005566","00000055","00000000","00000000"]);
+  // 18: Space station segment
+  writeTileStr(T(18), [
+    "00555500","05777750","57777775","57575757",
+    "57777775","05777750","00555500","00000000"]);
+  // 19: Space station arm
+  writeTileStr(T(19), [
+    "00055000","00055000","00055000","00055000",
+    "00055000","00055000","00055000","00055000"]);
+  // 20: Satellite dish
+  writeTileStr(T(20), [
+    "00000000","00055000","00577500","05555550",
+    "05555550","00050000","00500000","05000000"]);
+  // 21: Debris chunk
+  writeTileStr(T(21), [
+    "00000000","00550000","05555000","05555500",
+    "00555500","00055000","00000000","00000000"]);
+  // 22: Bright star (flare)
+  writeTileStr(T(22), [
+    "00070000","00070000","00777000","07777700",
+    "00777000","00070000","00070000","00000000"]);
+  // 23: Nebula edge (color 8 = cycling)
+  writeTileStr(T(23), [
+    "00000000","00000080","00008800","00088000",
+    "00880000","08800000","80000000","00000000"]);
+  // 24: Comet tail
+  writeTileStr(T(24), [
+    "00000007","00000077","00000770","00007700",
+    "00077000","00770000","07700000","77000000"]);
+  // 25: Planet atmosphere glow (color 3 = soft haze)
+  writeTileStr(T(25), [
+    "00000000","00000003","00000033","00000330",
+    "00003300","00033000","00330000","03300000"]);
+}
+
 // ============================================================
 //  SECTION 3: PALETTES
 // ============================================================
@@ -601,6 +969,70 @@ function generateLandscapePalette(biome) {
       setGroundPalette(7, [0,0,0],[200,180,255],[180,160,240],[220,200,255],[160,140,220],[240,220,255],[140,120,200],[250,235,255],
                           [200,150,255],[210,190,248],[190,170,242],[230,210,252],[150,130,210],[255,245,255],[120,100,190],[245,230,255]);
       break;
+
+    case "crystal":
+      generateThemedPalette("ice");
+      // Pal 4: cave wall / dark stone
+      setGroundPalette(4, [0,0,0],[25,20,40],[35,28,55],[45,35,70],[30,22,48],[55,42,82],[20,15,35],[40,30,60],
+                          [0,220,255],[50,38,75],[60,48,88],[22,18,38],[65,52,95],[28,22,42],[48,35,68],[55,42,80]);
+      // Pal 5: deeper cave stone
+      setGroundPalette(5, [0,0,0],[18,15,30],[28,22,45],[38,30,58],[22,18,35],[48,38,68],[15,12,25],[35,28,52],
+                          [0,220,255],[42,32,62],[55,42,78],[20,16,32],[58,45,82],[25,20,40],[45,35,65],[52,40,75]);
+      // Pal 6: crystal colors (cyan/magenta)
+      setGroundPalette(6, [0,0,0],[0,120,180],[0,160,220],[0,200,255],[80,0,180],[120,0,220],[0,100,160],[40,0,140],
+                          [0,255,255],[160,0,255],[0,180,240],[100,0,200],[0,220,255],[180,40,255],[60,0,160],[200,80,255]);
+      // Pal 7: crystal shimmer (color 8 = cycling)
+      setGroundPalette(7, [0,0,0],[0,180,220],[80,0,200],[0,220,255],[120,20,240],[0,200,240],[160,60,255],[0,240,255],
+                          [0,255,255],[100,255,255],[180,100,255],[0,200,200],[255,0,255],[80,220,255],[200,150,255],[150,255,255]);
+      break;
+
+    case "desert":
+      generateThemedPalette("fire");
+      // Pal 4: sand / ground
+      setGroundPalette(4, [0,0,0],[190,160,100],[170,140,80],[210,180,120],[200,170,110],[180,150,90],[220,190,130],[160,130,75],
+                          [255,200,80],[195,165,105],[230,200,140],[175,145,85],[240,210,150],[185,155,95],[205,175,115],[215,185,125]);
+      // Pal 5: stone / ruins
+      setGroundPalette(5, [0,0,0],[160,140,110],[180,155,125],[200,175,140],[140,120,95],[190,165,130],[150,130,100],[170,148,118],
+                          [255,200,80],[210,185,150],[120,105,82],[220,195,160],[130,112,88],[230,200,165],[145,125,98],[175,152,122]);
+      // Pal 6: sphinx / monument
+      setGroundPalette(6, [0,0,0],[140,110,70],[160,130,85],[180,150,100],[120,95,58],[200,165,110],[110,85,52],[170,140,92],
+                          [255,200,80],[190,155,105],[210,175,118],[130,102,65],[220,180,122],[100,78,48],[150,120,78],[175,142,95]);
+      // Pal 7: accent / shimmer (color 8 = cycling sand)
+      setGroundPalette(7, [0,0,0],[180,150,90],[200,170,110],[160,130,75],[220,190,130],[140,110,65],[210,180,120],[190,160,100],
+                          [255,220,100],[240,200,80],[230,190,70],[255,210,90],[220,180,60],[250,230,120],[200,165,55],[255,240,130]);
+      break;
+
+    case "neon":
+      generateThemedPalette("neon");
+      // Pal 4: dark building silhouettes
+      setGroundPalette(4, [0,0,0],[15,12,25],[20,18,35],[25,22,42],[18,15,30],[30,25,48],[12,10,20],[22,18,38],
+                          [255,0,128],[28,22,45],[35,28,55],[10,8,18],[32,26,50],[14,11,22],[26,20,40],[20,16,32]);
+      // Pal 5: building details / windows
+      setGroundPalette(5, [0,0,0],[15,12,25],[20,18,35],[25,22,42],[18,15,30],[120,120,80],[12,10,20],[22,18,38],
+                          [255,0,128],[180,180,120],[100,100,60],[10,8,18],[140,140,90],[160,160,100],[26,20,40],[200,200,140]);
+      // Pal 6: neon colors (cycling entries 8-10)
+      setGroundPalette(6, [0,0,0],[15,12,25],[20,18,35],[25,22,42],[18,15,30],[30,25,48],[12,10,20],[22,18,38],
+                          [255,0,128],[0,255,128],[128,0,255],[255,255,0],[0,200,255],[255,80,200],[100,255,100],[200,100,255]);
+      // Pal 7: neon signs / bright accents (8,9,A = fast cycling)
+      setGroundPalette(7, [0,0,0],[15,12,25],[120,0,80],[0,180,120],[200,0,255],[0,255,200],[180,180,0],[255,100,50],
+                          [255,0,255],[0,255,255],[255,255,0],[255,0,128],[0,255,128],[128,255,0],[255,128,0],[0,128,255]);
+      break;
+
+    case "space":
+      generateThemedPalette("midnight");
+      // Pal 4: deep space / stars
+      setGroundPalette(4, [0,0,0],[5,5,15],[8,8,22],[3,3,10],[10,10,28],[6,6,18],[4,4,12],[12,12,32],
+                          [80,120,255],[2,2,8],[15,15,38],[7,7,20],[18,18,42],[9,9,25],[20,20,48],[22,22,52]);
+      // Pal 5: structure / station
+      setGroundPalette(5, [0,0,0],[80,85,100],[100,105,120],[120,125,140],[140,145,160],[60,65,80],[90,95,110],[110,115,130],
+                          [80,120,255],[160,165,180],[50,55,70],[130,135,150],[150,155,170],[70,75,90],[170,175,190],[180,185,200]);
+      // Pal 6: planet surface
+      setGroundPalette(6, [0,0,0],[60,40,20],[80,55,30],[100,70,40],[120,85,50],[50,35,18],[70,48,25],[90,62,35],
+                          [80,120,255],[140,95,55],[110,78,42],[150,105,60],[45,30,15],[130,88,48],[160,110,65],[170,118,70]);
+      // Pal 7: nebula / cycling (8,9 = slow cycling)
+      setGroundPalette(7, [0,0,0],[255,255,255],[200,200,220],[180,180,200],[160,160,180],[220,220,240],[240,240,255],[140,140,160],
+                          [120,40,200],[180,60,255],[100,30,180],[220,100,255],[80,20,160],[160,50,220],[255,120,255],[200,80,240]);
+      break;
   }
   rebuildCGRAMCache();
 }
@@ -632,6 +1064,22 @@ function generateLandscapeRaster(biome) {
         break;
       case "void":
         r = 5 + t * 50; g = 0 + t * 10; b = 20 + t * 80;
+        break;
+      case "crystal":
+        // Dark at top (ceiling), slightly lighter mid, dark at bottom
+        r = 8 + Math.sin(t * Math.PI) * 20; g = 5 + Math.sin(t * Math.PI) * 15; b = 18 + Math.sin(t * Math.PI) * 35;
+        break;
+      case "desert":
+        // Pale blue top fading to warm gold at horizon
+        r = 100 + t * 155; g = 130 + t * 70; b = 200 - t * 130;
+        break;
+      case "neon":
+        // Dark purple top → deep magenta → pink at horizon (synthwave sunset)
+        r = 25 + t * 180; g = 5 + t * 30; b = 60 + t * 80;
+        break;
+      case "space":
+        // Black top → very dark blue → slight purple at bottom
+        r = 2 + t * 15; g = 2 + t * 8; b = 5 + t * 30;
         break;
       default: r = g = b = t * 60;
     }
@@ -1055,13 +1503,402 @@ function composeVoid(tm) {
   writeTilemapEntry(tm, 20, R-21, 17, 7, false, false);
 }
 
+// --- CRYSTAL CAVERN ---
+// Underground cave with stalactites, crystal formations, underground river,
+// stalagmites, mineral veins. The "sky" layer becomes cave ceiling texture.
+function composeCrystal(tm) {
+  const R = Math.ceil(SCREEN_H / 8);
+  clearTilemap(tm);
+
+  // Cave ceiling (top third) — solid cave texture
+  fillRect(tm, 0, 0, 32, 3, 17, 4);   // ceiling texture
+  fillRect(tm, 0, 3, 32, 2, 6, 4);    // cave wall
+
+  // Stalactites hanging from ceiling
+  writeTilemapEntry(tm, 3, 4, 7, 5, false, false);
+  writeTilemapEntry(tm, 4, 4, 8, 5, false, false);
+  writeTilemapEntry(tm, 8, 3, 7, 5, false, false);
+  writeTilemapEntry(tm, 14, 4, 8, 5, false, false);
+  writeTilemapEntry(tm, 15, 3, 7, 5, false, false);
+  writeTilemapEntry(tm, 20, 4, 7, 5, false, false);
+  writeTilemapEntry(tm, 25, 3, 8, 5, false, false);
+  writeTilemapEntry(tm, 26, 4, 7, 5, false, false);
+  writeTilemapEntry(tm, 30, 4, 8, 5, false, false);
+
+  // Dripping water from stalactites
+  writeTilemapEntry(tm, 8, 4, 20, 5, false, false);
+  writeTilemapEntry(tm, 15, 4, 20, 5, false, false);
+
+  // Cave walls on sides
+  fillCol(tm, 0, 0, R-1, 6, 4);
+  fillCol(tm, 1, 0, 5, 6, 4);
+  fillCol(tm, 31, 0, R-1, 6, 4);
+  fillCol(tm, 30, 0, 5, 6, 4);
+
+  // Mineral veins in walls
+  writeTilemapEntry(tm, 1, 8, 15, 6, false, false);
+  writeTilemapEntry(tm, 0, 12, 15, 6, false, false);
+  writeTilemapEntry(tm, 31, 10, 15, 6, false, false);
+  writeTilemapEntry(tm, 30, 14, 15, 6, false, false);
+
+  // Cave floor (bottom 7 rows)
+  fillRect(tm, 0, R-7, 32, 1, 3, 4);
+  fillRect(tm, 0, R-6, 32, 6, 1, 4);
+  fillRect(tm, 0, R-3, 32, 3, 2, 5);
+
+  // --- Large crystal cluster center-left (cols 5-8) ---
+  writeTilemapEntry(tm, 5, R-12, 9, 6, false, false);   // tall crystal
+  writeTilemapEntry(tm, 6, R-11, 9, 6, false, false);
+  writeTilemapEntry(tm, 7, R-10, 10, 6, false, false);  // wide crystal
+  writeTilemapEntry(tm, 5, R-10, 18, 6, false, false);  // large crystal left
+  writeTilemapEntry(tm, 6, R-10, 19, 6, false, false);  // large crystal right
+  writeTilemapEntry(tm, 4, R-9, 24, 6, false, false);   // small shard
+  writeTilemapEntry(tm, 8, R-9, 24, 6, false, false);
+
+  // --- Underground river/pool bottom-center (cols 10-22) ---
+  fillRow(tm, R-8, 10, 22, 13, 7);   // river surface
+  fillRow(tm, R-7, 10, 22, 14, 4);   // river deep
+  // Rubble at edges
+  writeTilemapEntry(tm, 9, R-8, 23, 4, false, false);
+  writeTilemapEntry(tm, 23, R-8, 23, 4, false, false);
+
+  // --- Stalagmites rising from floor right side (cols 24-29) ---
+  writeTilemapEntry(tm, 25, R-10, 11, 5, false, false);  // tall stalagmite
+  writeTilemapEntry(tm, 27, R-9, 12, 5, false, false);   // short stalagmite
+  writeTilemapEntry(tm, 29, R-10, 11, 5, false, false);
+  writeTilemapEntry(tm, 24, R-8, 12, 5, false, false);
+
+  // --- Crystal glow tiles scattered (eerie glow) ---
+  writeTilemapEntry(tm, 6, R-13, 16, 7, false, false);
+  writeTilemapEntry(tm, 12, 6, 16, 7, false, false);
+  writeTilemapEntry(tm, 18, 7, 16, 7, false, false);
+  writeTilemapEntry(tm, 24, R-12, 16, 7, false, false);
+  writeTilemapEntry(tm, 16, R-10, 16, 7, false, false);
+
+  // --- Gem deposits in walls ---
+  writeTilemapEntry(tm, 2, 6, 22, 6, false, false);
+  writeTilemapEntry(tm, 29, 8, 22, 6, false, false);
+
+  // --- Phosphorescent moss ---
+  writeTilemapEntry(tm, 10, R-8, 25, 6, false, false);
+  writeTilemapEntry(tm, 22, R-8, 25, 6, false, false);
+}
+
+// --- DESERT RUINS ---
+// Rolling sand dunes, sphinx monument, ruined columns, half-buried archway.
+function composeDesert(tm) {
+  const R = Math.ceil(SCREEN_H / 8);
+  clearTilemap(tm);
+
+  // Sand ground (bottom 8 rows)
+  fillRect(tm, 0, R-8, 32, 1, 3, 4);   // sand surface
+  fillRect(tm, 0, R-7, 32, 7, 1, 4);   // deep sand
+  fillRect(tm, 0, R-3, 32, 3, 8, 4);   // sand texture
+
+  // Rolling dunes across surface
+  writeTilemapEntry(tm, 2, R-9, 6, 4, false, false);    // dune slope left
+  writeTilemapEntry(tm, 3, R-9, 8, 4, false, false);    // sand flat
+  writeTilemapEntry(tm, 4, R-9, 7, 4, false, false);    // dune slope right
+  writeTilemapEntry(tm, 10, R-9, 6, 4, false, false);
+  writeTilemapEntry(tm, 11, R-9, 8, 4, false, false);
+  writeTilemapEntry(tm, 12, R-9, 8, 4, false, false);
+  writeTilemapEntry(tm, 13, R-9, 7, 4, false, false);
+
+  // --- Sphinx/monument on the right (cols 22-27, rows R-15 to R-8) ---
+  // Head
+  writeTilemapEntry(tm, 24, R-15, 15, 6, false, false); // headdress
+  writeTilemapEntry(tm, 24, R-14, 14, 6, false, false); // head
+  // Body
+  fillRect(tm, 22, R-13, 6, 4, 13, 6);                   // body blocks
+  // Paws
+  writeTilemapEntry(tm, 21, R-9, 21, 6, false, false);  // paw left
+  writeTilemapEntry(tm, 28, R-9, 21, 6, false, false);  // paw right
+  fillRow(tm, R-9, 22, 27, 13, 6);                        // lower body
+
+  // --- Ruined columns/arch left half-buried (cols 5-9) ---
+  // Tall column
+  writeTilemapEntry(tm, 6, R-13, 9, 5, false, false);   // half-buried column
+  writeTilemapEntry(tm, 6, R-12, 19, 5, false, false);  // obelisk segment
+  writeTilemapEntry(tm, 6, R-11, 19, 5, false, false);
+  writeTilemapEntry(tm, 6, R-10, 20, 5, false, false);  // obelisk top
+
+  // Archway
+  writeTilemapEntry(tm, 8, R-12, 11, 5, false, false);  // arch top
+  writeTilemapEntry(tm, 8, R-11, 12, 5, false, false);  // arch pillar
+  writeTilemapEntry(tm, 8, R-10, 12, 5, false, false);
+  writeTilemapEntry(tm, 8, R-9, 10, 5, false, false);   // crumbling wall
+
+  // Hieroglyph wall fragment
+  writeTilemapEntry(tm, 10, R-10, 23, 5, false, false);
+  writeTilemapEntry(tm, 10, R-9, 23, 5, false, false);
+
+  // --- Scattered stones ---
+  writeTilemapEntry(tm, 15, R-9, 17, 4, false, false);
+  writeTilemapEntry(tm, 19, R-9, 17, 4, false, false);
+  writeTilemapEntry(tm, 30, R-9, 17, 4, false, false);
+  writeTilemapEntry(tm, 1, R-9, 16, 5, false, false);   // sun-bleached stone
+
+  // --- Cactus skeleton ---
+  writeTilemapEntry(tm, 17, R-9, 25, 4, false, false);
+
+  // --- Heat shimmer tiles (cycling) ---
+  writeTilemapEntry(tm, 5, R-12, 22, 7, false, false);
+  writeTilemapEntry(tm, 14, R-11, 22, 7, false, false);
+  writeTilemapEntry(tm, 20, R-12, 22, 7, false, false);
+  writeTilemapEntry(tm, 28, R-11, 22, 7, false, false);
+
+  // --- Sand ripple cycling tiles ---
+  writeTilemapEntry(tm, 3, R-8, 18, 7, false, false);
+  writeTilemapEntry(tm, 16, R-8, 18, 7, false, false);
+  writeTilemapEntry(tm, 29, R-8, 18, 7, false, false);
+}
+
+// --- NEON CITY ---
+// Synthwave city skyline with neon signs, building silhouettes, puddle reflections.
+function composeNeon(tm) {
+  const R = Math.ceil(SCREEN_H / 8);
+  clearTilemap(tm);
+
+  // Street level (bottom 3 rows)
+  fillRect(tm, 0, R-3, 32, 1, 13, 4);  // street surface
+  fillRect(tm, 0, R-2, 32, 2, 1, 4);   // sub-street
+
+  // --- Building skyline (varying heights across bottom half) ---
+
+  // Tall skyscraper 1 (cols 2-4, tallest)
+  writeTilemapEntry(tm, 3, R-18, 9, 4, false, false);    // antenna top
+  fillRect(tm, 2, R-17, 3, 13, 7, 5);                     // building with windows
+  writeTilemapEntry(tm, 2, R-17, 8, 5, false, false);    // flat top left
+  writeTilemapEntry(tm, 4, R-17, 8, 5, false, false);    // flat top right
+  // Neon sign on facade
+  writeTilemapEntry(tm, 3, R-12, 21, 7, false, false);   // large neon sign
+  writeTilemapEntry(tm, 3, R-8, 10, 6, false, false);    // neon block
+
+  // Medium building (cols 6-9)
+  fillRect(tm, 6, R-13, 4, 9, 7, 5);
+  writeTilemapEntry(tm, 6, R-13, 8, 5, false, false);
+  writeTilemapEntry(tm, 9, R-13, 8, 5, false, false);
+  writeTilemapEntry(tm, 7, R-10, 10, 6, false, false);   // neon sign
+
+  // Short building (cols 10-12)
+  fillRect(tm, 10, R-9, 3, 5, 11, 5);
+  writeTilemapEntry(tm, 10, R-9, 8, 5, false, false);
+  writeTilemapEntry(tm, 12, R-9, 8, 5, false, false);
+
+  // Narrow building (cols 13-14)
+  fillRect(tm, 13, R-11, 2, 7, 18, 5);
+  writeTilemapEntry(tm, 13, R-11, 19, 5, false, false);
+
+  // Tall skyscraper 2 (cols 16-19)
+  writeTilemapEntry(tm, 17, R-20, 12, 4, false, false);  // spire top
+  fillRect(tm, 16, R-19, 4, 15, 7, 5);
+  writeTilemapEntry(tm, 16, R-19, 8, 5, false, false);
+  writeTilemapEntry(tm, 19, R-19, 8, 5, false, false);
+  // Neon signs
+  writeTilemapEntry(tm, 17, R-15, 21, 7, false, false);
+  writeTilemapEntry(tm, 18, R-11, 10, 6, false, false);
+  // Crane on top
+  writeTilemapEntry(tm, 19, R-20, 24, 4, false, false);
+
+  // Medium building (cols 20-23)
+  fillRect(tm, 20, R-12, 4, 8, 11, 5);
+  writeTilemapEntry(tm, 20, R-12, 8, 5, false, false);
+  writeTilemapEntry(tm, 23, R-12, 8, 5, false, false);
+  // Billboard
+  writeTilemapEntry(tm, 21, R-13, 15, 7, false, false);
+
+  // Short building right (cols 25-28)
+  fillRect(tm, 25, R-10, 4, 6, 7, 5);
+  writeTilemapEntry(tm, 25, R-10, 8, 5, false, false);
+  writeTilemapEntry(tm, 28, R-10, 8, 5, false, false);
+  writeTilemapEntry(tm, 26, R-7, 10, 6, false, false);
+
+  // Edge building right (cols 29-31)
+  fillRect(tm, 29, R-14, 3, 10, 7, 5);
+  writeTilemapEntry(tm, 29, R-14, 8, 5, false, false);
+
+  // --- Neon stripes on buildings ---
+  writeTilemapEntry(tm, 2, R-6, 16, 6, false, false);
+  writeTilemapEntry(tm, 16, R-6, 16, 6, false, false);
+
+  // --- Puddle reflections in street ---
+  writeTilemapEntry(tm, 5, R-4, 14, 7, false, false);
+  writeTilemapEntry(tm, 12, R-4, 14, 7, false, false);
+  writeTilemapEntry(tm, 20, R-4, 14, 7, false, false);
+  writeTilemapEntry(tm, 27, R-4, 14, 7, false, false);
+
+  // --- Traffic light ---
+  writeTilemapEntry(tm, 15, R-6, 23, 7, false, false);
+
+  // --- Fire escape on tall building ---
+  writeTilemapEntry(tm, 4, R-14, 25, 5, false, false);
+  writeTilemapEntry(tm, 4, R-10, 25, 5, false, false);
+}
+
+// --- DEEP SPACE ---
+// Mostly transparent (sky shows through as corrupted space). Planet, nebula,
+// star fields, space station. Unique because most of screen is transparent.
+function composeSpace(tm) {
+  const R = Math.ceil(SCREEN_H / 8);
+  clearTilemap(tm);
+
+  // Mostly empty — transparent tiles let sky layer show through as deep space
+
+  // --- Scattered star tiles throughout ---
+  writeTilemapEntry(tm, 2, 2, 6, 7, false, false);
+  writeTilemapEntry(tm, 8, 5, 6, 7, false, false);
+  writeTilemapEntry(tm, 15, 1, 7, 7, false, false);
+  writeTilemapEntry(tm, 22, 4, 6, 7, false, false);
+  writeTilemapEntry(tm, 28, 2, 6, 7, false, false);
+  writeTilemapEntry(tm, 5, 10, 6, 7, false, false);
+  writeTilemapEntry(tm, 12, 8, 7, 7, false, false);
+  writeTilemapEntry(tm, 19, 6, 6, 7, false, false);
+  writeTilemapEntry(tm, 26, 9, 6, 7, false, false);
+  writeTilemapEntry(tm, 1, 15, 6, 7, false, false);
+  writeTilemapEntry(tm, 30, 12, 7, 7, false, false);
+
+  // Bright star flares
+  writeTilemapEntry(tm, 10, 3, 22, 7, false, false);
+  writeTilemapEntry(tm, 25, 7, 22, 7, false, false);
+
+  // --- Nebula cloud formation upper-left (cols 3-7, rows 4-8) ---
+  writeTilemapEntry(tm, 4, 5, 8, 7, false, false);    // nebula center
+  writeTilemapEntry(tm, 5, 4, 9, 7, false, false);    // nebula wisp
+  writeTilemapEntry(tm, 3, 6, 9, 7, false, false);
+  writeTilemapEntry(tm, 6, 6, 23, 7, false, false);   // nebula edge
+  writeTilemapEntry(tm, 5, 7, 23, 7, false, false);
+
+  // --- Planet in the lower-right quadrant (cols 20-27, rows R-12 to R-5) ---
+  // Planet atmosphere glow
+  writeTilemapEntry(tm, 21, R-12, 25, 6, false, false);
+  writeTilemapEntry(tm, 27, R-12, 25, 6, false, false);
+
+  // Top curve of planet
+  writeTilemapEntry(tm, 24, R-11, 10, 6, false, false);  // top-right curve
+  writeTilemapEntry(tm, 23, R-11, 11, 6, false, false);  // top-left curve
+
+  // Planet body
+  fillRect(tm, 22, R-10, 5, 3, 12, 6);                    // planet surface fill
+  writeTilemapEntry(tm, 21, R-10, 11, 6, false, false);  // left edge
+  writeTilemapEntry(tm, 27, R-10, 10, 6, false, false);  // right edge
+  writeTilemapEntry(tm, 21, R-9, 11, 6, false, false);
+  writeTilemapEntry(tm, 27, R-9, 10, 6, false, false);
+  writeTilemapEntry(tm, 21, R-8, 11, 6, false, false);
+  writeTilemapEntry(tm, 27, R-8, 10, 6, false, false);
+
+  // Bottom curve of planet
+  writeTilemapEntry(tm, 23, R-7, 14, 6, false, false);   // bottom-left curve
+  writeTilemapEntry(tm, 24, R-7, 13, 6, false, false);   // bottom-right curve
+  fillRow(tm, R-7, 22, 22, 14, 6);
+  fillRow(tm, R-7, 26, 26, 13, 6);
+
+  // Planet ring crossing in front (diagonal)
+  writeTilemapEntry(tm, 19, R-9, 17, 5, false, false);   // ring diagonal falling
+  writeTilemapEntry(tm, 20, R-9, 15, 5, false, false);   // ring horizontal
+  writeTilemapEntry(tm, 28, R-9, 15, 5, false, false);   // ring horizontal
+  writeTilemapEntry(tm, 29, R-9, 16, 5, false, false);   // ring diagonal rising
+
+  // --- Space station upper-right (cols 26-29, rows 2-5) ---
+  writeTilemapEntry(tm, 27, 2, 18, 5, false, false);     // station segment
+  writeTilemapEntry(tm, 28, 2, 18, 5, false, false);     // station segment
+  writeTilemapEntry(tm, 27, 3, 19, 5, false, false);     // station arm
+  writeTilemapEntry(tm, 29, 3, 19, 5, false, false);     // station arm
+  writeTilemapEntry(tm, 26, 2, 20, 5, false, false);     // satellite dish
+
+  // --- Debris / small asteroid ---
+  writeTilemapEntry(tm, 14, 12, 21, 5, false, false);
+  writeTilemapEntry(tm, 8, R-6, 21, 5, false, false);
+
+  // --- Comet ---
+  writeTilemapEntry(tm, 17, 3, 24, 7, false, false);
+}
+
 // ============================================================
 //  SECTION 6: SCENE DEFINITIONS
 // ============================================================
 
 const landscapeSceneIndices = [];
 
+// --- Color interpolation helpers for day/night cycle ---
+
+function lerpSnesColor(a, b, t) {
+  const rA = a & 0x1F, gA = (a >> 5) & 0x1F, bA = (a >> 10) & 0x1F;
+  const rB = b & 0x1F, gB = (b >> 5) & 0x1F, bB = (b >> 10) & 0x1F;
+  const rO = Math.round(rA + (rB - rA) * t) & 0x1F;
+  const gO = Math.round(gA + (gB - gA) * t) & 0x1F;
+  const bO = Math.round(bA + (bB - bA) * t) & 0x1F;
+  return rO | (gO << 5) | (bO << 10);
+}
+
+function interpolateRaster(from, to, t) {
+  const len = Math.min(from.length, to.length);
+  const result = new Uint16Array(len);
+  for (let y = 0; y < len; y++) {
+    result[y] = lerpSnesColor(from[y], to[y], t);
+  }
+  return result;
+}
+
+function generateRasterBase(biome) {
+  const h = SCREEN_H;
+  const arr = new Uint16Array(h);
+  for (let y = 0; y < h; y++) {
+    const t = y / h;
+    let r, g, b;
+    switch (biome) {
+      case "forest":   r = 25 + t * 160; g = 8 + t * 60; b = 80 - t * 50; break;
+      case "ice":       r = 200 - t * 140; g = 215 - t * 95; b = 250 - t * 30; break;
+      case "alien":     r = 15 + t * 120; g = 40 + t * 80; b = 70 - t * 40; break;
+      case "volcanic":  r = 30 + t * 200; g = 5 + t * 60; b = 5; break;
+      case "ocean":     r = 10 + t * 180; g = 15 + t * 50; b = 50 + t * 80; break;
+      case "void":      r = 5 + t * 50; g = 0 + t * 10; b = 20 + t * 80; break;
+      case "crystal":   r = 20 + t * 30; g = 15 + t * 40; b = 40 + t * 50; break;
+      case "desert":    r = 80 + t * 160; g = 60 + t * 100; b = 30 + t * 40; break;
+      case "neon":      r = 10 + t * 60; g = 5 + t * 20; b = 30 + t * 80; break;
+      case "space":     r = 2 + t * 15; g = 0 + t * 8; b = 8 + t * 30; break;
+      default: r = g = b = t * 60;
+    }
+    arr[y] = rgbToSnesColor(
+      Math.min(255, Math.max(0, Math.round(r))),
+      Math.min(255, Math.max(0, Math.round(g))),
+      Math.min(255, Math.max(0, Math.round(b))));
+  }
+  return arr;
+}
+
+function generateRasterAlt(biome) {
+  const h = SCREEN_H;
+  const arr = new Uint16Array(h);
+  for (let y = 0; y < h; y++) {
+    const t = y / h;
+    let r, g, b;
+    switch (biome) {
+      case "forest":   r = 40 + t * 80; g = 5 + t * 20; b = 60 + t * 30; break;
+      case "ice":       r = 30 + t * 40; g = 30 + t * 50; b = 80 + t * 60; break;
+      case "alien":     r = 30 + t * 90; g = 10 + t * 30; b = 50 + t * 80; break;
+      case "volcanic":  r = 15 + t * 120; g = 2 + t * 15; b = 0 + t * 8; break;
+      case "ocean":     r = 5 + t * 100; g = 5 + t * 25; b = 30 + t * 50; break;
+      case "void":      r = 2 + t * 25; g = 0 + t * 5; b = 10 + t * 45; break;
+      case "crystal":   r = 10 + t * 15; g = 8 + t * 20; b = 25 + t * 35; break;
+      case "desert":    r = 20 + t * 80; g = 15 + t * 40; b = 40 + t * 30; break;
+      case "neon":      r = 5 + t * 40; g = 2 + t * 10; b = 20 + t * 60; break;
+      case "space":     r = 1 + t * 8; g = 0 + t * 4; b = 4 + t * 18; break;
+      default: r = g = b = t * 30;
+    }
+    arr[y] = rgbToSnesColor(
+      Math.min(255, Math.max(0, Math.round(r))),
+      Math.min(255, Math.max(0, Math.round(g))),
+      Math.min(255, Math.max(0, Math.round(b))));
+  }
+  return arr;
+}
+
 function createLandscapeScene(biome, displayName, composeFn) {
+  // Scene-local closure variables for parallax and day/night
+  let skyScrollAccum = 0;
+  let rasterBase = null;
+  let rasterAlt = null;
+
   return {
     name: displayName,
     landscape: true,
@@ -1085,6 +1922,10 @@ function createLandscapeScene(biome, displayName, composeFn) {
         case "volcanic":  generateVolcanicTiles(); break;
         case "ocean":     generateOceanTiles(); break;
         case "void":      generateVoidTiles(); break;
+        case "crystal":   generateCrystalTiles(); break;
+        case "desert":    generateDesertTiles(); break;
+        case "neon":      generateNeonTiles(); break;
+        case "space":     generateSpaceTiles(); break;
       }
 
       // BG0 (ground foreground): landscape tiles
@@ -1112,18 +1953,155 @@ function createLandscapeScene(biome, displayName, composeFn) {
       rasterEnabled = true;
       generateLandscapeRaster(biome);
 
+      // --- Part 3: Day/Night — store base and alt raster gradients ---
+      rasterBase = generateRasterBase(biome);
+      rasterAlt = generateRasterAlt(biome);
+      skyScrollAccum = 0;
+
       // Static — no scroll
       bgScrollX.fill(0);
       bgScrollY.fill(0);
 
       // Per-biome PPU effects
-      ghostEnabled = (biome === "forest" || biome === "void" || biome === "ocean");
-      ghostAlpha = biome === "void" ? 0.45 : biome === "ocean" ? 0.2 : 0.15;
+      ghostEnabled = (biome === "forest" || biome === "void" || biome === "ocean" || biome === "crystal" || biome === "neon" || biome === "space");
+      ghostAlpha = biome === "void" ? 0.45 : biome === "ocean" ? 0.2 : biome === "crystal" ? 0.25 : biome === "neon" ? 0.3 : biome === "space" ? 0.1 : 0.15;
 
       windowEnabled = false;
-      spritesEnabled = false;
       colorMathMode = (biome === "volcanic") ? 1 : 0;
       fixedColor = biome === "volcanic" ? { r: 6, g: 1, b: 0 } : { r: 0, g: 0, b: 0 };
+
+      // --- Part 1: Weather Particles ---
+      spritesEnabled = true;
+      particles = [];
+      switch (biome) {
+        case "forest": {
+          // 20 fireflies: slow lazy drifting
+          for (let i = 0; i < 20; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: glitchRand() * SCREEN_H,
+              vx: (glitchRand() - 0.5) * 0.6, vy: (glitchRand() - 0.5) * 0.6,
+              tile: 22, palette: 7,
+              life: glitchRandInt(400), maxLife: 500 + glitchRandInt(300), size: 8
+            });
+          }
+          break;
+        }
+        case "ice": {
+          // 30 snow particles: slow falling with horizontal drift
+          for (let i = 0; i < 30; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: -8 - glitchRand() * SCREEN_H,
+              vx: (glitchRand() - 0.5) * 0.6, vy: 0.5 + glitchRand() * 1.0,
+              tile: glitchRandInt(64), palette: glitchRandInt(3),
+              life: 0, maxLife: 400 + glitchRandInt(200), size: 8
+            });
+          }
+          break;
+        }
+        case "alien": {
+          // 15 spores: very slow rising with gentle wobble
+          for (let i = 0; i < 15; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: SCREEN_H + glitchRand() * 60,
+              vx: (glitchRand() - 0.5) * 0.4, vy: -(0.2 + glitchRand() * 0.6),
+              tile: 17, palette: 7,
+              life: 0, maxLife: 350 + glitchRandInt(250), size: 8
+            });
+          }
+          break;
+        }
+        case "volcanic": {
+          // 25 embers: faster rise with wider scatter
+          for (let i = 0; i < 25; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: SCREEN_H + glitchRand() * 80,
+              vx: (glitchRand() - 0.5) * 1.6, vy: -(1.0 + glitchRand() * 2.0),
+              tile: glitchRandInt(128), palette: 7,
+              life: 0, maxLife: 200 + glitchRandInt(200), size: 8
+            });
+          }
+          break;
+        }
+        case "ocean": {
+          // 8 seabirds: horizontal flight across screen
+          for (let i = 0; i < 8; i++) {
+            const fromLeft = glitchRand() > 0.5;
+            particles.push({
+              x: fromLeft ? -8 : SCREEN_W + 8,
+              y: 10 + glitchRand() * (SCREEN_H * 0.3),
+              vx: fromLeft ? (0.5 + glitchRand() * 1.0) : -(0.5 + glitchRand() * 1.0),
+              vy: (glitchRand() - 0.5) * 0.4,
+              tile: glitchRandInt(64), palette: 5,
+              life: 0, maxLife: 600 + glitchRandInt(300), size: 8
+            });
+          }
+          break;
+        }
+        case "void": {
+          // 12 dust motes: very slow orbit (default speed / 3)
+          const countV = 12;
+          for (let i = 0; i < countV; i++) {
+            const angle = (i / countV) * Math.PI * 2;
+            const radius = 40 + glitchRand() * 60;
+            particles.push({
+              x: Math.floor(SCREEN_W / 2) + Math.cos(angle) * radius,
+              y: Math.floor(SCREEN_H / 2) + Math.sin(angle) * radius,
+              vx: -Math.sin(angle) * 0.125, vy: Math.cos(angle) * 0.125,
+              tile: 17, palette: 7,
+              life: 0, maxLife: 9999, size: 8
+            });
+          }
+          break;
+        }
+        case "crystal": {
+          // 10 drip particles: slow falling from ceiling
+          for (let i = 0; i < 10; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: -8 - glitchRand() * 40,
+              vx: (glitchRand() - 0.5) * 0.2, vy: 0.3 + glitchRand() * 0.5,
+              tile: glitchRandInt(64), palette: 6,
+              life: 0, maxLife: 500 + glitchRandInt(200), size: 8
+            });
+          }
+          break;
+        }
+        case "desert": {
+          // 15 sand particles: blowing right to left
+          for (let i = 0; i < 15; i++) {
+            particles.push({
+              x: SCREEN_W + glitchRand() * SCREEN_W, y: glitchRand() * SCREEN_H,
+              vx: -(1.0 + glitchRand() * 1.0), vy: (glitchRand() - 0.5) * 0.6,
+              tile: glitchRandInt(64), palette: 4,
+              life: 0, maxLife: 350 + glitchRandInt(200), size: 8
+            });
+          }
+          break;
+        }
+        case "neon": {
+          // 20 rain particles: moderate cyberpunk rain
+          for (let i = 0; i < 20; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: -8 - glitchRand() * SCREEN_H,
+              vx: (glitchRand() - 0.5) * 0.5, vy: 1.5 + glitchRand() * 2.5,
+              tile: glitchRandInt(64), palette: glitchRandInt(3),
+              life: 0, maxLife: 250 + glitchRandInt(150), size: 8
+            });
+          }
+          break;
+        }
+        case "space": {
+          // 8 very slow drift particles
+          for (let i = 0; i < 8; i++) {
+            particles.push({
+              x: glitchRand() * SCREEN_W, y: glitchRand() * SCREEN_H,
+              vx: (glitchRand() - 0.5) * 0.15, vy: (glitchRand() - 0.5) * 0.15,
+              tile: glitchRandInt(64), palette: 7,
+              life: glitchRandInt(300), maxLife: 800 + glitchRandInt(400), size: 8
+            });
+          }
+          break;
+        }
+      }
 
       // Color cycling — this is the main animation driver
       colorCycleRanges = [];
@@ -1156,6 +2134,24 @@ function createLandscapeScene(biome, displayName, composeFn) {
           colorCycleRanges.push({ palIdx: 7, startCol: 8, endCol: 12, speed: 0.025, counter: 0, direction: 1 });
           colorCycleRanges.push({ palIdx: 4, startCol: 8, endCol: 10, speed: 0.015, counter: 0, direction: -1 });
           break;
+        case "crystal":
+          // Crystal shimmer: palette 7, color 8 cycling + palette 6 glow
+          colorCycleRanges.push({ palIdx: 7, startCol: 8, endCol: 12, speed: 0.04, counter: 0, direction: 1 });
+          colorCycleRanges.push({ palIdx: 6, startCol: 8, endCol: 11, speed: 0.03, counter: 0, direction: -1 });
+          break;
+        case "desert":
+          // Slow sand shimmer: palette 7, color 8 cycling
+          colorCycleRanges.push({ palIdx: 7, startCol: 8, endCol: 11, speed: 0.02, counter: 0, direction: 1 });
+          break;
+        case "neon":
+          // Fast neon cycling: palette 7 and 6 bright neon colors
+          colorCycleRanges.push({ palIdx: 7, startCol: 8, endCol: 15, speed: 0.10, counter: 0, direction: 1 });
+          colorCycleRanges.push({ palIdx: 6, startCol: 8, endCol: 15, speed: 0.08, counter: 0, direction: -1 });
+          break;
+        case "space":
+          // Slow nebula cycling: palette 7, colors 8-10
+          colorCycleRanges.push({ palIdx: 7, startCol: 8, endCol: 12, speed: 0.02, counter: 0, direction: 1 });
+          break;
       }
 
       hdmaEffects = [];
@@ -1163,7 +2159,28 @@ function createLandscapeScene(biome, displayName, composeFn) {
     },
 
     update(localFrame) {
-      // NO SCROLLING — this is a still portrait
+      // --- Part 1: Update weather particles ---
+      updateParticles();
+
+      // --- Part 2: Subtle parallax sky drift ---
+      // BG0 (ground) stays COMPLETELY FIXED — critical for portrait feel
+      bgScrollX[0] = 0;
+      bgScrollY[0] = 0;
+      // BG1 (sky) gets very slow horizontal drift for select biomes
+      // No parallax for void (ethereal, sky should be still) or crystal (underground)
+      if (biome !== "void" && biome !== "crystal") {
+        skyScrollAccum += 0.25; // ~1 pixel per 4 frames — almost imperceptible
+        bgScrollX[1] = Math.floor(skyScrollAccum);
+      }
+
+      // --- Part 3: Day/Night cycle — slow raster gradient interpolation ---
+      if (rasterBase && rasterAlt) {
+        const t = Math.min(1, sceneElapsedMs / SCENE_DURATION_MS);
+        const st = t * t * (3 - 2 * t); // smoothstep for natural transition
+        for (let y = 0; y < SCREEN_H; y++) {
+          rasterColors[y] = lerpSnesColor(rasterBase[y], rasterAlt[y], st);
+        }
+      }
 
       // --- Sky corruption (evolving background) ---
       glitchIntensity = 0.25 + Math.sin(localFrame * 0.0015) * 0.15;
@@ -1225,6 +2242,32 @@ function createLandscapeScene(biome, displayName, composeFn) {
             });
           }
           break;
+
+        case "desert":
+          // Heat shimmer HDMA across horizon
+          if (localFrame % 25 === 0 && hdmaEffects.length < 4) {
+            hdmaEffects.push({
+              startScanline: 30,
+              register: "scrollX",
+              bg: 1,
+              values: Array.from({ length: 50 }, (_, i) =>
+                Math.floor(Math.sin((localFrame + i) * 0.06) * 3))
+            });
+          }
+          break;
+
+        case "neon":
+          // Flickering neon via occasional palette jitter on sky
+          if (localFrame % 20 === 0 && hdmaEffects.length < 4) {
+            hdmaEffects.push({
+              startScanline: Math.floor(SCREEN_H * 0.3),
+              register: "scrollX",
+              bg: 1,
+              values: Array.from({ length: 30 }, (_, i) =>
+                Math.floor(Math.sin((localFrame * 0.03 + i * 0.5)) * 1))
+            });
+          }
+          break;
       }
 
       // HDMA cleanup
@@ -1243,6 +2286,10 @@ const LANDSCAPE_BIOMES = [
   { id: "volcanic",  name: "VOLCANIC RUINS",     fn: composeVolcanic },
   { id: "ocean",     name: "DIGITAL OCEAN",      fn: composeOcean },
   { id: "void",      name: "VOID TEMPLE",        fn: composeVoid },
+  { id: "crystal",   name: "CRYSTAL CAVERN",     fn: composeCrystal },
+  { id: "desert",    name: "DESERT RUINS",       fn: composeDesert },
+  { id: "neon",      name: "NEON CITY",          fn: composeNeon },
+  { id: "space",     name: "DEEP SPACE",         fn: composeSpace },
 ];
 
 for (const b of LANDSCAPE_BIOMES) {

@@ -160,6 +160,246 @@ function generateEnhancedTiles() {
 }
 
 // ============================================================
+//  SECTION 2B: DITHERING TILE PATTERNS
+// ============================================================
+
+// 32 classic SNES dithering pattern tiles at VRAM address 0x5000
+function generateDitherTiles() {
+  const base = 0x5000;
+
+  for (let tile = 0; tile < 32; tile++) {
+    const addr = base + tile * 32;
+    for (let row = 0; row < 8; row++) {
+      let pixels = new Uint8Array(8);
+      const group = (tile >> 3) & 3; // 0-3: four families of 8
+
+      switch (group) {
+        case 0: { // Ordered Bayer matrix dithering (8 tiles)
+          const variant = tile & 7;
+          // Bayer matrices at different sizes/thresholds
+          const bayer2x2 = [0, 2, 3, 1]; // 2x2 normalized
+          const bayer4x4 = [
+             0,  8,  2, 10,
+            12,  4, 14,  6,
+             3, 11,  1,  9,
+            15,  7, 13,  5
+          ];
+          const bayer8x8 = [
+             0, 32,  8, 40,  2, 34, 10, 42,
+            48, 16, 56, 24, 50, 18, 58, 26,
+            12, 44,  4, 36, 14, 46,  6, 38,
+            60, 28, 52, 20, 62, 30, 54, 22,
+             3, 35, 11, 43,  1, 33,  9, 41,
+            51, 19, 59, 27, 49, 17, 57, 25,
+            15, 47,  7, 39, 13, 45,  5, 37,
+            63, 31, 55, 23, 61, 29, 53, 21
+          ];
+
+          for (let x = 0; x < 8; x++) {
+            let threshold, matrixVal;
+            if (variant < 2) {
+              // 2x2 Bayer, two threshold levels
+              matrixVal = bayer2x2[(row & 1) * 2 + (x & 1)];
+              threshold = variant === 0 ? 1 : 2;
+              pixels[x] = matrixVal >= threshold ? (1 + variant) : 0;
+            } else if (variant < 5) {
+              // 4x4 Bayer at three threshold levels
+              matrixVal = bayer4x4[(row & 3) * 4 + (x & 3)];
+              threshold = 4 + (variant - 2) * 4; // 4, 8, 12
+              const colA = 1 + (variant - 2);
+              const colB = 4 - (variant - 2);
+              pixels[x] = matrixVal >= threshold ? colA : colB;
+            } else {
+              // 8x8 Bayer at three threshold levels
+              matrixVal = bayer8x8[row * 8 + x];
+              threshold = 16 + (variant - 5) * 16; // 16, 32, 48
+              const colA = 2 + (variant - 5);
+              const colB = 3 - (variant - 5);
+              pixels[x] = matrixVal >= threshold ? colA : colB;
+            }
+          }
+          break;
+        }
+
+        case 1: { // Checkerboard patterns (8 tiles)
+          const variant = tile & 7;
+          for (let x = 0; x < 8; x++) {
+            switch (variant) {
+              case 0: // Standard 1x1 checkerboard
+                pixels[x] = ((x ^ row) & 1) ? 2 : 1;
+                break;
+              case 1: // Offset checkerboard (shifted every other row)
+                pixels[x] = (((x + (row >> 1)) ^ row) & 1) ? 3 : 1;
+                break;
+              case 2: // Double-width checkerboard (2x1 blocks)
+                pixels[x] = (((x >> 1) ^ row) & 1) ? 2 : 4;
+                break;
+              case 3: // Double-height checkerboard (1x2 blocks)
+                pixels[x] = ((x ^ (row >> 1)) & 1) ? 1 : 3;
+                break;
+              case 4: // 2x2 block checkerboard
+                pixels[x] = (((x >> 1) ^ (row >> 1)) & 1) ? 2 : 1;
+                break;
+              case 5: // Alternating-row checkerboard with color pair swap
+                pixels[x] = ((x ^ row) & 1) ? ((row & 2) ? 4 : 2) : ((row & 2) ? 1 : 3);
+                break;
+              case 6: // Sparse checkerboard (every 3rd pixel)
+                pixels[x] = ((x % 3 === 0) && (row % 3 === 0)) ? 3 : ((x + row) & 1) ? 1 : 0;
+                break;
+              case 7: // Dense checkerboard with border highlight
+                pixels[x] = (x === 0 || x === 7 || row === 0 || row === 7)
+                  ? 4 : ((x ^ row) & 1) ? 2 : 1;
+                break;
+            }
+          }
+          break;
+        }
+
+        case 2: { // Horizontal line dithering (8 tiles)
+          const variant = tile & 7;
+          for (let x = 0; x < 8; x++) {
+            switch (variant) {
+              case 0: // Every-other-line
+                pixels[x] = (row & 1) ? 2 : 0;
+                break;
+              case 1: // Every-other-line inverse
+                pixels[x] = (row & 1) ? 0 : 3;
+                break;
+              case 2: // Every-third-line
+                pixels[x] = (row % 3 === 0) ? 2 : 0;
+                break;
+              case 3: // Every-third-line double-thick
+                pixels[x] = (row % 3 !== 2) ? 1 : 0;
+                break;
+              case 4: // Gradient fade: dense at top, sparse at bottom
+                pixels[x] = (row < 2) ? 3 : (row < 4) ? ((x & 1) ? 2 : 0) :
+                  (row < 6) ? ((x % 3 === 0) ? 1 : 0) : 0;
+                break;
+              case 5: // Inverse gradient: sparse at top, dense at bottom
+                pixels[x] = (row >= 6) ? 3 : (row >= 4) ? ((x & 1) ? 2 : 0) :
+                  (row >= 2) ? ((x % 3 === 0) ? 1 : 0) : 0;
+                break;
+              case 6: // Paired scan lines (two on, two off)
+                pixels[x] = ((row >> 1) & 1) ? 2 : 0;
+                break;
+              case 7: // Alternating color scan lines
+                pixels[x] = [1, 0, 2, 0, 3, 0, 4, 0][row];
+                break;
+            }
+          }
+          break;
+        }
+
+        case 3: { // Diagonal / cross / dot dithering (8 tiles)
+          const variant = tile & 7;
+          for (let x = 0; x < 8; x++) {
+            switch (variant) {
+              case 0: // 45-degree diagonal stripes (2px wide)
+                pixels[x] = ((x + row) & 3) < 2 ? 2 : 0;
+                break;
+              case 1: // 45-degree diagonal stripes (1px)
+                pixels[x] = ((x + row) & 3) === 0 ? 3 : 0;
+                break;
+              case 2: // Opposite diagonal stripes
+                pixels[x] = ((x - row + 8) & 3) < 2 ? 1 : 0;
+                break;
+              case 3: // Cross-hatch (both diagonals)
+                pixels[x] = (((x + row) & 3) === 0 || ((x - row + 8) & 3) === 0) ? 3 : 0;
+                break;
+              case 4: // Diamond pattern
+                pixels[x] = ((Math.abs(x - 3.5) + Math.abs(row - 3.5)) < 3) ? 2 :
+                  ((Math.abs(x - 3.5) + Math.abs(row - 3.5)) < 4) ? 1 : 0;
+                break;
+              case 5: // Dot screen (halftone)
+                pixels[x] = ((x & 3) === 0 && (row & 3) === 0) ? 4 :
+                  ((x & 3) === 2 && (row & 3) === 2) ? 2 : 0;
+                break;
+              case 6: // Wide cross-hatch
+                pixels[x] = (((x + row) % 4 < 2) && ((x - row + 8) % 4 < 2)) ? 3 : 1;
+                break;
+              case 7: // Stipple (pseudo-random ordered dots)
+                pixels[x] = (((x * 5 + row * 3) & 7) < 2) ? 2 :
+                  (((x * 3 + row * 7) & 7) < 1) ? 4 : 0;
+                break;
+            }
+          }
+          break;
+        }
+      }
+
+      // Encode as 4bpp bitplanes (same layout as other tile generators)
+      let bp0 = 0, bp1 = 0, bp2 = 0, bp3 = 0;
+      for (let x = 0; x < 8; x++) {
+        const bit = 7 - x;
+        bp0 |= ((pixels[x] >> 0) & 1) << bit;
+        bp1 |= ((pixels[x] >> 1) & 1) << bit;
+        bp2 |= ((pixels[x] >> 2) & 1) << bit;
+        bp3 |= ((pixels[x] >> 3) & 1) << bit;
+      }
+      VRAM[(addr + row * 2) & 0xFFFF] = bp0;
+      VRAM[(addr + row * 2 + 1) & 0xFFFF] = bp1;
+      VRAM[(addr + 16 + row * 2) & 0xFFFF] = bp2;
+      VRAM[(addr + 16 + row * 2 + 1) & 0xFFFF] = bp3;
+    }
+  }
+}
+
+// ============================================================
+//  SECTION 2C: MODE 7 PERSPECTIVE FLOOR HELPER
+// ============================================================
+
+// Sets up a Mode 7 perspective floor with per-scanline HDMA scaling.
+// horizonLine: scanline where the floor begins (above = sky)
+// scale: base scale multiplier for the floor
+// rotation: initial rotation angle in radians
+function setupMode7PerspectiveFloor(horizonLine, scale, rotation) {
+  ppuMode = 7;
+  bgEnabled[0] = false;
+  bgEnabled[1] = false;
+
+  m7x = SCREEN_W >> 1;
+  m7y = SCREEN_H >> 1;
+  m7hofs = 0;
+  m7vofs = 0;
+
+  // Set base rotation
+  m7a = Math.cos(rotation) * scale;
+  m7b = Math.sin(rotation) * scale;
+  m7c = -Math.sin(rotation) * scale;
+  m7d = Math.cos(rotation) * scale;
+
+  // Build per-scanline HDMA tables for the perspective effect.
+  // Above the horizon: very small scale values (sky tiles stay flat/tiled).
+  // Below the horizon: progressive scaling that creates a receding plane.
+  // Scanlines near horizon = large m7a/m7d (far away, zoomed out).
+  // Scanlines at bottom = small m7a/m7d (close, zoomed in).
+  const m7aValues = [];
+  const m7dValues = [];
+
+  for (let i = 0; i < SCREEN_H; i++) {
+    if (i < horizonLine) {
+      // Above horizon — sky; use a tiny flat scale so tiles remain visible
+      m7aValues.push(0.05 * Math.cos(rotation));
+      m7dValues.push(0.05 * Math.cos(rotation));
+    } else {
+      // Perspective floor: distance from horizon determines scale
+      const distFromHorizon = i - horizonLine + 1; // 1..N
+      const maxDist = SCREEN_H - horizonLine;
+      // Near horizon (small distFromHorizon) = far away = large scale factor
+      // Near bottom (large distFromHorizon) = close up = small scale factor
+      const perspectiveScale = (maxDist / distFromHorizon) * scale * 0.15;
+      m7aValues.push(perspectiveScale * Math.cos(rotation));
+      m7dValues.push(perspectiveScale * Math.cos(rotation));
+    }
+  }
+
+  hdmaEffects = [
+    { startScanline: 0, register: "m7a", values: m7aValues },
+    { startScanline: 0, register: "m7d", values: m7dValues }
+  ];
+}
+
+// ============================================================
 //  SECTION 3: THEMED PALETTE GENERATION
 // ============================================================
 
@@ -816,6 +1056,7 @@ const scenes = [
       generateTileData();
       generateBG2Tiles();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateTilemaps();
       generateThemedPalette("ocean");
       rasterEnabled = false;
@@ -850,6 +1091,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("crt");
       generateRasterGradient("crt");
       initColorCycling("pulse");
@@ -939,6 +1181,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("neon");
       generateRasterGradient("rainbow");
       initColorCycling("split");
@@ -988,6 +1231,7 @@ const scenes = [
       bgEnabled[0] = false; bgEnabled[1] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("sunset");
       generateRasterGradient("sunset");
       initColorCycling("slow");
@@ -1082,6 +1326,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("ruins");
       generateRasterGradient("void");
       initColorCycling("off");
@@ -1144,6 +1389,7 @@ const scenes = [
       generateTileData();
       generateBG2Tiles();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("neon");
       generateRasterGradient("fire");
       initColorCycling("full");
@@ -1349,6 +1595,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("neon");
       generateRasterGradient("rainbow");
       initColorCycling("split");
@@ -1392,6 +1639,7 @@ const scenes = [
       bgEnabled[0] = false; bgEnabled[1] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("synthwave");
       generateRasterGradient("synthwave");
       initColorCycling("chase");
@@ -1425,6 +1673,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("moss");
       generateRasterGradient("void");
       initColorCycling("breathe");
@@ -1457,6 +1706,7 @@ const scenes = [
       generateTileData();
       generateBG2Tiles();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("ice");
       rasterEnabled = false;
       initColorCycling("full");
@@ -1488,6 +1738,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("infrared");
       generateRasterGradient("infrared");
       initColorCycling("pulse");
@@ -1521,6 +1772,7 @@ const scenes = [
       generateTileData();
       generateBG2Tiles();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("ocean");
       generateRasterGradient("ocean");
       initColorCycling("slow");
@@ -1559,6 +1811,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateBG2Tiles();
       generateTilemaps();
       generateThemedPalette("coral");
@@ -1601,6 +1854,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("midnight");
       generateRasterGradient("midnight");
       initColorCycling("breathe");
@@ -1638,6 +1892,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("stained");
       rasterEnabled = false;
       initColorCycling("chase");
@@ -1693,6 +1948,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("neon");
       generateRasterGradient("crt");
       initColorCycling("off");
@@ -1726,6 +1982,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("fire");
       generateRasterGradient("fire");
       initColorCycling("pulse");
@@ -1761,6 +2018,7 @@ const scenes = [
       bgEnabled[0] = false; bgEnabled[1] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("forest");
       rasterEnabled = false;
       initColorCycling("slow");
@@ -1795,6 +2053,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateThemedPalette("amber");
       generateRasterGradient("void");
       initColorCycling("full");
@@ -1842,6 +2101,7 @@ const scenes = [
       bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
       generateTileData();
       generateEnhancedTiles();
+      generateDitherTiles();
       generateBG2Tiles();
       generateThemedPalette("synthwave");
       generateRasterGradient("rainbow");
@@ -1884,6 +2144,123 @@ const scenes = [
       if (localFrame % 45 === 0) glitchBusConflict();
       if (localFrame % 50 === 0) glitchScrollOverflow();
       if (localFrame % 55 === 0) glitchHDMA();
+    }
+  },
+
+  // ---- SCENE 25: RACING HORIZON ----
+  {
+    name: "RACING HORIZON",
+    setup() {
+      // Mode 7 perspective floor with dither-tile ground pattern
+      const horizonLine = 80;
+      setupMode7PerspectiveFloor(horizonLine, 1.0, 0);
+
+      // Generate ground tile data — use dither tiles for an interesting floor
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+
+      // Write a ground pattern into Mode 7 tilemap area using dither tile indices.
+      // Mode 7 tilemap: 128x128 entries at VRAM[0..16383], each byte = tile index.
+      // We write a repeating pattern that mixes checkerboard and stripe dither tiles
+      // to create a visible grid-like racing ground.
+      for (let ty = 0; ty < 128; ty++) {
+        for (let tx = 0; tx < 128; tx++) {
+          const addr = (ty * 128 + tx) & 0xFFFF;
+          // Create a grid pattern: every 4th tile is a stripe, else checkerboard
+          const isGridLine = (tx & 7) === 0 || (ty & 7) === 0;
+          if (isGridLine) {
+            // Use diagonal dither tile (index based on position in dither region)
+            VRAM[addr] = ((tx + ty) & 0xF) + 16; // varied tile indices
+          } else {
+            // Alternate between checkerboard patterns
+            VRAM[addr] = ((tx ^ ty) & 3) + 4; // low tile indices — geometric patterns
+          }
+        }
+      }
+
+      // Synthwave-inspired palette: deep purples, hot pinks, cyan highlights
+      generateThemedPalette("synthwave");
+
+      // Raster gradient sky above horizon — sunset/vaporwave gradient
+      generateRasterGradient("synthwave");
+      rasterEnabled = true;
+
+      // Ghost frame for motion trails
+      ghostEnabled = true;
+      ghostAlpha = 0.35;
+
+      // Subtle color math — additive glow
+      colorMathMode = 1;
+      fixedColor = { r: 3, g: 1, b: 6 };
+
+      // Color cycling for palette animation
+      initColorCycling("chase");
+
+      // No sprites, no windows
+      spritesEnabled = false;
+      windowEnabled = false;
+
+      // Start scrolling into the floor
+      m7vofs = 0;
+    },
+    update(localFrame) {
+      // Slow rotation of the floor plane
+      const rotSpeed = 0.0003;
+      const rotation = localFrame * rotSpeed;
+      const horizonLine = 80;
+
+      // Update Mode 7 matrix with rotation
+      const cosR = Math.cos(rotation);
+      const sinR = Math.sin(rotation);
+      m7b = sinR * 0.25;
+      m7c = -sinR * 0.25;
+
+      // Rebuild HDMA perspective values with current rotation baked in
+      const m7aValues = hdmaEffects[0].values;
+      const m7dValues = hdmaEffects[1].values;
+      for (let i = 0; i < SCREEN_H; i++) {
+        if (i < horizonLine) {
+          m7aValues[i] = 0.05 * cosR;
+          m7dValues[i] = 0.05 * cosR;
+        } else {
+          const distFromHorizon = i - horizonLine + 1;
+          const maxDist = SCREEN_H - horizonLine;
+          const perspectiveScale = (maxDist / distFromHorizon) * 0.15;
+          m7aValues[i] = perspectiveScale * cosR;
+          m7dValues[i] = perspectiveScale * cosR;
+        }
+      }
+
+      // Scroll forward into the plane
+      if (localFrame % 4 === 0) m7vofs += 3;
+      // Gentle lateral drift
+      m7hofs = Math.floor(Math.sin(localFrame * 0.001) * 30);
+
+      // Raster gradient: shift it slowly for a living sky
+      rasterOffset = localFrame;
+
+      // Ghost trail evolves
+      ghostAlpha = 0.25 + Math.sin(localFrame * 0.005) * 0.15;
+
+      // Subtle corruption that warps the perspective
+      if (localFrame % 30 === 0) glitchMode7();
+      if (localFrame % 50 === 0) glitchVRAMBitRot();
+      if (localFrame % 60 === 0) glitchDMAMisfire();
+
+      // Occasionally nudge the HDMA values for glitchy perspective warp
+      if (glitchRand() < 0.015) {
+        const scanline = glitchRandInt(SCREEN_H - horizonLine) + horizonLine;
+        const jitter = (glitchRand() - 0.5) * 2.0;
+        if (scanline < m7aValues.length) {
+          m7aValues[scanline] += jitter;
+          m7dValues[scanline] += jitter;
+        }
+      }
+
+      // Slow pulsing color math glow
+      fixedColor.r = Math.floor(3 + Math.sin(localFrame * 0.004) * 2) & 0x1F;
+      fixedColor.b = Math.floor(6 + Math.cos(localFrame * 0.003) * 4) & 0x1F;
     }
   },
 ];
@@ -1992,6 +2369,7 @@ document.addEventListener("keydown", (e) => {
     case "R":
       resetPPU();
       generateEnhancedTiles();
+      generateDitherTiles();
       if (currentScene >= 0 && currentScene < scenes.length) {
         scenes[currentScene].setup();
       }
@@ -2276,6 +2654,7 @@ if (typeof OFFLINE_RENDER === "undefined") {
   // Initialize PPU with enhanced tiles
   resetPPU();
   generateEnhancedTiles();
+  generateDitherTiles();
 
   // Start with a random scene
   currentScene = Math.floor(Math.random() * scenes.length);

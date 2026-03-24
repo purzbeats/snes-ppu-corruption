@@ -541,6 +541,9 @@ function renderFrame() {
     }
   }
 
+  // Post-render: apply scanline dropout if active
+  applyScanlineDropout();
+
   ctx.putImageData(imgData, 0, 0);
 }
 
@@ -1349,6 +1352,120 @@ function glitchTileMorph() {
   }
 }
 
+// --- GLITCH: Scanline dropout (post-render framebuffer corruption) ---
+let scanlineDropoutActive = false;
+let scanlineDropoutStart = 0;
+let scanlineDropoutLines = 0;
+let scanlineDropoutMode = 0;
+
+function glitchScanlineDropout() {
+  // Simulate PPU running out of time — drop 2-6 consecutive scanlines
+  scanlineDropoutActive = true;
+  scanlineDropoutLines = 2 + glitchRandInt(5);
+  scanlineDropoutStart = glitchRandInt(Math.max(1, SCREEN_H - scanlineDropoutLines));
+  scanlineDropoutMode = glitchRandInt(3); // 0=black, 1=repeat line above, 2=backdrop
+}
+
+function applyScanlineDropout() {
+  if (!scanlineDropoutActive) return;
+  scanlineDropoutActive = false; // auto-clear after one frame
+
+  const startY = scanlineDropoutStart;
+  const count = Math.min(scanlineDropoutLines, SCREEN_H - startY);
+
+  for (let dy = 0; dy < count; dy++) {
+    const y = startY + dy;
+    const fbOffset = y * SCREEN_W;
+
+    switch (scanlineDropoutMode) {
+      case 0:
+        // Zero out — black scanlines
+        for (let x = 0; x < SCREEN_W; x++) fb[fbOffset + x] = 0xFF000000;
+        break;
+      case 1:
+        // Repeat the line above (or black if at top)
+        if (y > 0) {
+          const srcOffset = (y - 1) * SCREEN_W;
+          for (let x = 0; x < SCREEN_W; x++) fb[fbOffset + x] = fb[srcOffset + x];
+        } else {
+          for (let x = 0; x < SCREEN_W; x++) fb[fbOffset + x] = 0xFF000000;
+        }
+        break;
+      case 2:
+        // Fill with backdrop color
+        for (let x = 0; x < SCREEN_W; x++) fb[fbOffset + x] = cgramCache[0];
+        break;
+    }
+  }
+}
+
+// --- GLITCH: Address line fault (stuck/floating VRAM address bit) ---
+function glitchAddressLineFault() {
+  // Simulate a stuck or floating address line on VRAM bus.
+  // XOR a single high bit into all tile indices in a BG tilemap.
+  // This causes every tile to read from a wrong location — dramatic instant reorganization.
+  // The corruption persists like real hardware damage.
+  const bgIdx = glitchRandInt(2); // BG0 or BG1
+  const tmBase = bgTilemapAddr[bgIdx];
+  const bitPos = 8 + glitchRandInt(6); // bit 8-13 of tile index
+  const xorMask = 1 << bitPos;
+
+  // SNES tilemap entries are 2 bytes: low byte = tile number bits 0-7,
+  // high byte: vhopppcc where cc = tile number bits 8-9
+  // Bits 8-9 of tile index are in the high byte bits 0-1.
+  // Bits 10+ don't exist in the tilemap entry, but we can corrupt
+  // the low byte (bits 0-7) and the tile-index bits in the high byte.
+  for (let i = 0; i < TILEMAP_SIZE; i += 2) {
+    const addr = (tmBase + i) & 0xFFFF;
+    const lo = VRAM[addr];
+    const hi = VRAM[(addr + 1) & 0xFFFF];
+
+    // Reconstruct tile index (10 bits: hi[1:0] << 8 | lo)
+    let tileIdx = lo | ((hi & 0x03) << 8);
+    tileIdx ^= (xorMask & 0x3FF); // mask to 10-bit range
+
+    // Write back
+    VRAM[addr] = tileIdx & 0xFF;
+    VRAM[(addr + 1) & 0xFFFF] = (hi & 0xFC) | ((tileIdx >> 8) & 0x03);
+  }
+}
+
+// --- GLITCH: H-blank overflow (bottom of screen shows wrong tiles) ---
+function glitchHBlankOverflow() {
+  // Simulate running out of H-blank time mid-frame.
+  // Everything below a random scanline gets shifted tile indices and optionally wrong palettes.
+  // This creates the classic "bottom half of screen is wrong" look.
+  const tmBase = bgTilemapAddr[0]; // target BG0
+  const overflowScanline = 4 + glitchRandInt(SCREEN_H - 8); // avoid extremes
+  const overflowRow = Math.floor(overflowScanline / TILE_SIZE); // tilemap row where overflow starts
+  const tileOffset = (glitchRand() < 0.5 ? 32 : 64); // shift amount
+  const shiftPalette = glitchRand() < 0.4; // 40% chance to also corrupt palette bits
+
+  for (let row = overflowRow; row < 32; row++) {
+    for (let col = 0; col < 32; col++) {
+      const entryAddr = (tmBase + (row * 32 + col) * 2) & 0xFFFF;
+      const lo = VRAM[entryAddr];
+      const hi = VRAM[(entryAddr + 1) & 0xFFFF];
+
+      // Add offset to 10-bit tile index
+      let tileIdx = lo | ((hi & 0x03) << 8);
+      tileIdx = (tileIdx + tileOffset) & 0x3FF;
+
+      let newHi = (hi & 0xFC) | ((tileIdx >> 8) & 0x03);
+
+      // Optionally shift palette bits (bits 2-4 of high byte)
+      if (shiftPalette) {
+        let pal = (newHi >> 2) & 0x07;
+        pal = (pal + 1) & 0x07;
+        newHi = (newHi & 0xE3) | (pal << 2);
+      }
+
+      VRAM[entryAddr] = tileIdx & 0xFF;
+      VRAM[(entryAddr + 1) & 0xFFFF] = newHi;
+    }
+  }
+}
+
 // --- Master glitch dispatcher ---
 const GLITCH_NAMES = [
   "DMA Misfire",
@@ -1360,7 +1477,10 @@ const GLITCH_NAMES = [
   "Bitplane Error",
   "Bus Conflict",
   "Scroll Overflow",
-  "Tile Morph"
+  "Tile Morph",
+  "Scanline Dropout",
+  "Address Line Fault",
+  "HBlank Overflow"
 ];
 
 const GLITCH_FNS = [
@@ -1373,7 +1493,10 @@ const GLITCH_FNS = [
   glitchBitplaneError,
   glitchBusConflict,
   glitchScrollOverflow,
-  glitchTileMorph
+  glitchTileMorph,
+  glitchScanlineDropout,
+  glitchAddressLineFault,
+  glitchHBlankOverflow
 ];
 
 let activeGlitchNames = [];

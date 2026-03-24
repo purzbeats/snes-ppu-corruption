@@ -385,7 +385,7 @@ function getSubmenuItems(key) {
         },
         { label: "RESET SCENE", type: "action",
           action: () => {
-            resetPPU(); generateEnhancedTiles();
+            resetPPU(); generateEnhancedTiles(); generateDitherTiles();
             if (currentScene >= 0 && currentScene < scenes.length) scenes[currentScene].setup();
             sceneTimer = 0; sceneElapsedMs = 0;
           }

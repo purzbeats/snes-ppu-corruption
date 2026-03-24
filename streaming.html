@@ -36,6 +36,7 @@ canvas {
 <script src="ppu.js"></script>
 <script src="engine.js"></script>
 <script src="landscape.js"></script>
+<script src="crt.js"></script>
 
 <script>
 // ============================================================
@@ -201,6 +202,7 @@ mainLoop = function() {
 applyFullscreenResolution();
 resetPPU();
 generateEnhancedTiles();
+generateDitherTiles();
 
 // Start with first scene from shuffled playlist
 currentScene = STREAM_PLAYLIST[0];

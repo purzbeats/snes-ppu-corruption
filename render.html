@@ -234,6 +234,7 @@ function startPreview() {
 
   resetPPU();
   generateEnhancedTiles();
+  generateDitherTiles();
 
   const sceneIdx = sceneVal === "random" ? Math.floor(Math.random() * scenes.length) : parseInt(sceneVal);
   currentScene = sceneIdx;
@@ -274,6 +275,7 @@ async function startRender() {
   // Initialize
   resetPPU();
   generateEnhancedTiles();
+  generateDitherTiles();
   rebuildCGRAMCache();
 
   const sceneIdx = sceneVal === "random" ? Math.floor(Math.random() * scenes.length) : parseInt(sceneVal);
@@ -575,6 +577,7 @@ try {
   resizePPU(256, 224);
   resetPPU();
   generateEnhancedTiles();
+  generateDitherTiles();
 
   const thumbScene = document.getElementById("scene-select").value;
   const thumbIdx = thumbScene === "random" ? 0 : parseInt(thumbScene);

@@ -546,31 +546,13 @@ function pollGamepad() {
     userInteracted();
   }
 
-  // Triangle = glitch burst (always)
-  if (gpPressed(gp, GP_TRIANGLE)) {
-    lastGlitchBurst = frameCount;
-    for (let i = 0; i < 15; i++) GLITCH_FNS[glitchRandInt(GLITCH_FNS.length)]();
-    if (typeof glitchSpriteCorrupt === "function") glitchSpriteCorrupt();
-    userInteracted();
-  }
-
-  // Square = screenshot (always)
-  if (gpPressed(gp, GP_SQUARE)) {
-    const link = document.createElement("a");
-    link.download = `snes_corruption_${Date.now()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-    userInteracted();
-  }
-
-  // L2/R2 = cycle glitch mode
-  if (gpPressed(gp, GP_L2)) {
-    glitchMode = (glitchMode - 1 + GLITCH_FNS.length + 1) % (GLITCH_FNS.length + 1);
-    userInteracted();
-  }
-  if (gpPressed(gp, GP_R2)) {
-    glitchMode = (glitchMode + 1) % (GLITCH_FNS.length + 1);
-    userInteracted();
+  // Any other button press counts as interaction (disables attract mode)
+  for (let i = 0; i < gp.buttons.length; i++) {
+    if (i === GP_OPTIONS || i === GP_L1 || i === GP_R1) continue;
+    if (gp.buttons[i] && gp.buttons[i].pressed) {
+      userInteracted();
+      break;
+    }
   }
 
   // --- Menu-only controls ---

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SNES PPU Corruption Engine</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: monospace;
+}
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  width: 1024px;
+  height: 896px;
+}
+#ui {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: #8f8;
+  font-size: 11px;
+  z-index: 10;
+  pointer-events: none;
+  text-shadow: 0 0 4px #0f02;
+  line-height: 1.6;
+}
+#controls {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  color: #555;
+  font-size: 9px;
+  z-index: 10;
+  pointer-events: none;
+  line-height: 1.8;
+}
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<div id="controls">
+  [SPACE] glitch burst &nbsp; [N/P] next/prev scene &nbsp; [A] auto-advance &nbsp;
+  [T] tile morph &nbsp; [1-9] lock glitch &nbsp; [0] auto<br>
+  [G] ghost &nbsp; [W] window &nbsp; [M] mode 7 &nbsp;
+  [R] reset &nbsp; [F] freeze &nbsp; [S] screenshot
+</div>
+<canvas id="screen" width="256" height="224"></canvas>
+<script src="ppu.js"></script>
+<script src="engine.js"></script>
+</body>
+</html>

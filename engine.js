@@ -2267,22 +2267,26 @@ window.addEventListener("resize", () => {
 GLITCH_NAMES.push("Sprite Corrupt", "Window Glitch", "Cycle Desync", "Raster Corrupt", "Ghost Frame");
 GLITCH_FNS.push(glitchSpriteCorrupt, glitchWindow, glitchColorCycleDesync, glitchRasterCorrupt, glitchGhostFrame);
 
-// Fill the viewport immediately
-applyFullscreenResolution();
+// Only auto-boot when loaded from index.html (not render.html)
+// render.html defines OFFLINE_RENDER before loading engine.js
+if (typeof OFFLINE_RENDER === "undefined") {
+  // Fill the viewport immediately
+  applyFullscreenResolution();
 
-// Initialize PPU with enhanced tiles
-resetPPU();
-generateEnhancedTiles();
+  // Initialize PPU with enhanced tiles
+  resetPPU();
+  generateEnhancedTiles();
 
-// Start with a random scene
-currentScene = Math.floor(Math.random() * scenes.length);
-scenes[currentScene].setup();
-sceneTimer = 0;
-sceneElapsedMs = 0;
-transitionElapsedMs = 0;
-sceneTransitionPhase = 3; // fade in from black
-sceneBrightness = 0;
-lastFrameTime = performance.now(); // reset so first delta isn't huge
+  // Start with a random scene
+  currentScene = Math.floor(Math.random() * scenes.length);
+  scenes[currentScene].setup();
+  sceneTimer = 0;
+  sceneElapsedMs = 0;
+  transitionElapsedMs = 0;
+  sceneTransitionPhase = 3; // fade in from black
+  sceneBrightness = 0;
+  lastFrameTime = performance.now();
 
-// GO
-mainLoop();
+  // GO
+  mainLoop();
+}

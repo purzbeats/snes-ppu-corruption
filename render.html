@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SNES PPU Corruption — Offline Renderer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  color: #ccc;
+  font-family: monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+h1 { color: #8f8; margin-bottom: 10px; font-size: 16px; }
+#status { margin: 10px 0; color: #ff8; font-size: 13px; }
+#progress-bar {
+  width: 600px; height: 20px;
+  background: #222; border: 1px solid #444;
+  margin: 10px 0;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: #4f4;
+  transition: width 0.1s;
+}
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 1px solid #333;
+  margin: 10px 0;
+  max-width: 800px;
+}
+#controls-panel {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 15px 20px;
+  margin: 10px 0;
+  width: 600px;
+}
+#controls-panel label {
+  display: inline-block;
+  width: 100px;
+  color: #888;
+  font-size: 12px;
+}
+#controls-panel select, #controls-panel input {
+  background: #222;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 12px;
+  margin: 3px 0;
+}
+#controls-panel input[type="number"] { width: 80px; }
+button {
+  background: #2a4a2a;
+  color: #8f8;
+  border: 1px solid #4f4;
+  padding: 8px 24px;
+  font-family: monospace;
+  font-size: 14px;
+  cursor: pointer;
+  margin: 5px;
+}
+button:hover { background: #3a6a3a; }
+button:disabled { opacity: 0.4; cursor: default; }
+#scene-list { font-size: 10px; color: #555; margin-top: 5px; }
+</style>
+</head>
+<body>
+<h1>SNES PPU CORRUPTION — OFFLINE RENDERER</h1>
+
+<div id="controls-panel">
+  <div>
+    <label>Scene:</label>
+    <select id="scene-select"></select>
+  </div>
+  <div>
+    <label>Duration:</label>
+    <input type="number" id="duration" value="30" min="1" max="600"> seconds
+  </div>
+  <div>
+    <label>FPS:</label>
+    <select id="fps-select">
+      <option value="24">24</option>
+      <option value="30">30</option>
+      <option value="60" selected>60</option>
+    </select>
+  </div>
+  <div>
+    <label>Width:</label>
+    <input type="number" id="render-w" value="256" min="128" max="1920" step="8">
+    <label style="width:auto;margin-left:10px">Height:</label>
+    <input type="number" id="render-h" value="224" min="112" max="1080" step="8">
+    <button onclick="document.getElementById('render-w').value=1920;document.getElementById('render-h').value=1080" style="padding:3px 8px;font-size:10px">1080p</button>
+    <button onclick="document.getElementById('render-w').value=3840;document.getElementById('render-h').value=2160" style="padding:3px 8px;font-size:10px">4K</button>
+    <button onclick="document.getElementById('render-w').value=480;document.getElementById('render-h').value=270" style="padding:3px 8px;font-size:10px">SNES 4x</button>
+  </div>
+  <div>
+    <label>Format:</label>
+    <select id="format-select">
+      <option value="webm">WebM video</option>
+      <option value="frames">PNG frames (zip)</option>
+    </select>
+  </div>
+  <div style="margin-top: 10px">
+    <button id="btn-render" onclick="startRender()">RENDER</button>
+    <button id="btn-cancel" onclick="cancelRender()" disabled>CANCEL</button>
+    <button id="btn-preview" onclick="startPreview()">PREVIEW</button>
+  </div>
+</div>
+
+<div id="status">Ready</div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
+<canvas id="screen" width="256" height="224"></canvas>
+
+<!-- Hidden UI elements that engine.js expects -->
+<div id="ui" style="display:none"></div>
+<div id="controls" style="display:none"></div>
+
+<script src="ppu.js"></script>
+<script>
+// Prevent both ppu.js standalone boot AND engine.js auto-boot
+const ENGINE_LOADED = true;
+const OFFLINE_RENDER = true;
+</script>
+<script src="engine.js"></script>
+<script>
+// ============================================================
+//  OFFLINE RENDERER
+// ============================================================
+
+let rendering = false;
+let cancelled = false;
+
+// Populate scene dropdown
+function populateScenes() {
+  const sel = document.getElementById("scene-select");
+  const opt0 = document.createElement("option");
+  opt0.value = "random";
+  opt0.textContent = "Random";
+  sel.appendChild(opt0);
+
+  for (let i = 0; i < scenes.length; i++) {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${i}: ${scenes[i].name}`;
+    sel.appendChild(opt);
+  }
+}
+
+// Parse URL params for headless/automated use
+function parseURLParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("scene")) document.getElementById("scene-select").value = params.get("scene");
+  if (params.has("duration")) document.getElementById("duration").value = params.get("duration");
+  if (params.has("fps")) document.getElementById("fps-select").value = params.get("fps");
+  if (params.has("width")) document.getElementById("render-w").value = params.get("width");
+  if (params.has("height")) document.getElementById("render-h").value = params.get("height");
+  if (params.has("auto")) setTimeout(startRender, 500);
+}
+
+function setStatus(msg) {
+  document.getElementById("status").textContent = msg;
+}
+
+function setProgress(pct) {
+  document.getElementById("progress-fill").style.width = pct + "%";
+}
+
+// Preview: just run the normal engine on selected scene
+function startPreview() {
+  const sceneVal = document.getElementById("scene-select").value;
+  const w = parseInt(document.getElementById("render-w").value) || 256;
+  const h = parseInt(document.getElementById("render-h").value) || 224;
+
+  resizePPU(w, h);
+  canvas.style.maxWidth = "800px";
+  canvas.style.width = "auto";
+  canvas.style.height = "auto";
+
+  resetPPU();
+  generateEnhancedTiles();
+
+  const sceneIdx = sceneVal === "random" ? Math.floor(Math.random() * scenes.length) : parseInt(sceneVal);
+  currentScene = sceneIdx;
+  scenes[sceneIdx].setup();
+  sceneTimer = 0;
+  sceneElapsedMs = 0;
+  sceneAutoAdvance = false;
+  sceneTransitionPhase = 0;
+  sceneBrightness = 1.0;
+  frozen = false;
+  lastFrameTime = performance.now();
+
+  setStatus("Previewing: " + scenes[sceneIdx].name + " (close tab or click RENDER to stop)");
+  mainLoop();
+}
+
+async function startRender() {
+  if (rendering) return;
+  rendering = true;
+  cancelled = false;
+  frozen = true; // stop any live preview
+
+  document.getElementById("btn-render").disabled = true;
+  document.getElementById("btn-cancel").disabled = false;
+
+  const sceneVal = document.getElementById("scene-select").value;
+  const durationSec = parseFloat(document.getElementById("duration").value) || 30;
+  const fps = parseInt(document.getElementById("fps-select").value) || 60;
+  const w = parseInt(document.getElementById("render-w").value) || 256;
+  const h = parseInt(document.getElementById("render-h").value) || 224;
+  const format = document.getElementById("format-select").value;
+  const totalFrames = Math.ceil(durationSec * fps);
+  const frameDeltaMs = 1000 / fps;
+
+  // Setup PPU at render resolution
+  resizePPU(w, h);
+
+  // Initialize
+  resetPPU();
+  generateEnhancedTiles();
+  rebuildCGRAMCache();
+
+  const sceneIdx = sceneVal === "random" ? Math.floor(Math.random() * scenes.length) : parseInt(sceneVal);
+  currentScene = sceneIdx;
+  scenes[sceneIdx].setup();
+  sceneTimer = 0;
+  sceneElapsedMs = 0;
+  transitionElapsedMs = 0;
+  sceneTransitionPhase = 0;
+  sceneBrightness = 1.0;
+  sceneAutoAdvance = false;
+
+  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at ${w}x${h} ${fps}fps...`);
+  setProgress(0);
+
+  if (format === "webm") {
+    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h);
+  } else {
+    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h);
+  }
+
+  document.getElementById("btn-render").disabled = false;
+  document.getElementById("btn-cancel").disabled = true;
+  rendering = false;
+}
+
+function cancelRender() {
+  cancelled = true;
+  setStatus("Cancelling...");
+}
+
+// Render one frame at a fixed timestep (no rAF dependency)
+function renderOneFrame(frameDeltaMs) {
+  // Clear HDMA
+  if (hdmaEffects.length > 12) {
+    hdmaEffects = hdmaEffects.slice(-4);
+  } else if (glitchRand() < 0.08) {
+    hdmaEffects = hdmaEffects.slice(-4);
+  }
+
+  mosaicSize = 1;
+  updateSceneDirector(frameDeltaMs);
+  updateColorCycling();
+  renderFrame();
+  frameCount++;
+}
+
+// --- WebM video output via MediaRecorder ---
+async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
+  const stream = canvas.captureStream(0); // 0 = manual frame capture
+  const track = stream.getVideoTracks()[0];
+
+  // Try to get a good codec
+  let mimeType = "video/webm;codecs=vp9";
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = "video/webm;codecs=vp8";
+  }
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = "video/webm";
+  }
+
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: Math.max(5000000, w * h * fps * 0.5) // scale bitrate with resolution
+  });
+
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+  const done = new Promise((resolve) => { recorder.onstop = resolve; });
+  recorder.start();
+
+  const batchSize = 4; // render N frames then yield to UI
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    if (cancelled) break;
+
+    renderOneFrame(frameDeltaMs);
+
+    // Request the stream capture a frame
+    if (track.requestFrame) {
+      track.requestFrame();
+    }
+
+    // Yield to UI periodically for progress updates
+    if (frame % batchSize === 0) {
+      const pct = ((frame / totalFrames) * 100).toFixed(1);
+      setProgress(parseFloat(pct));
+      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%)`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  recorder.stop();
+  await done;
+
+  if (!cancelled) {
+    const blob = new Blob(chunks, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snes_${scenes[sceneIdx].name.toLowerCase().replace(/\s+/g, "_")}_${w}x${h}_${fps}fps.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(`Done! ${totalFrames} frames rendered. File downloading.`);
+    setProgress(100);
+  } else {
+    setStatus("Cancelled.");
+    setProgress(0);
+  }
+}
+
+// --- PNG frame sequence output ---
+async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
+  // We'll collect frames and zip them
+  // For simplicity, use individual downloads if no zip library,
+  // or accumulate blobs in memory
+  setStatus("Rendering frames to memory...");
+
+  const frameBlobs = [];
+  const batchSize = 2;
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    if (cancelled) break;
+
+    renderOneFrame(frameDeltaMs);
+
+    // Capture frame as PNG blob
+    const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+    frameBlobs.push({ name: `frame_${String(frame).padStart(6, "0")}.png`, blob });
+
+    if (frame % batchSize === 0) {
+      const pct = ((frame / totalFrames) * 100).toFixed(1);
+      setProgress(parseFloat(pct));
+      setStatus(`Rendering frames — ${frame}/${totalFrames} (${pct}%) — ${(frameBlobs.length * blob.size / 1048576).toFixed(0)}MB in memory`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  if (cancelled) {
+    setStatus("Cancelled.");
+    setProgress(0);
+    return;
+  }
+
+  // Build a simple ZIP file (no library needed — minimal ZIP format)
+  setStatus("Building ZIP...");
+  await new Promise(r => setTimeout(r, 50));
+
+  const zipBlob = await buildZip(frameBlobs);
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `snes_${scenes[sceneIdx].name.toLowerCase().replace(/\s+/g, "_")}_${w}x${h}_${fps}fps_frames.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  setStatus(`Done! ${frameBlobs.length} frames rendered. ZIP downloading.`);
+  setProgress(100);
+}
+
+// Minimal ZIP builder (no compression — store only, keeps it simple and fast)
+async function buildZip(files) {
+  const localHeaders = [];
+  const centralHeaders = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const data = new Uint8Array(await file.blob.arrayBuffer());
+    const nameBytes = new TextEncoder().encode(file.name);
+
+    // Local file header
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);  // signature
+    lv.setUint16(4, 20, true);           // version needed
+    lv.setUint16(6, 0, true);            // flags
+    lv.setUint16(8, 0, true);            // compression (store)
+    lv.setUint16(10, 0, true);           // mod time
+    lv.setUint16(12, 0, true);           // mod date
+    lv.setUint32(14, 0, true);           // crc32 (0 for store)
+    lv.setUint32(18, data.length, true); // compressed size
+    lv.setUint32(22, data.length, true); // uncompressed size
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);           // extra length
+    local.set(nameBytes, 30);
+    local.set(data, 30 + nameBytes.length);
+    localHeaders.push(local);
+
+    // Central directory header
+    const central = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0, true);
+    cv.setUint32(16, 0, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0x20, true);
+    cv.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    centralHeaders.push(central);
+
+    offset += local.length;
+  }
+
+  const centralOffset = offset;
+  let centralSize = 0;
+  for (const c of centralHeaders) centralSize += c.length;
+
+  // End of central directory
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, centralOffset, true);
+  ev.setUint16(20, 0, true);
+
+  return new Blob([...localHeaders, ...centralHeaders, eocd], { type: "application/zip" });
+}
+
+// --- Init ---
+populateScenes();
+parseURLParams();
+
+// Don't auto-start the live engine — just show the UI
+// The user clicks PREVIEW to see live, or RENDER to export
+resetPPU();
+generateEnhancedTiles();
+resizePPU(256, 224);
+
+// Show first frame of first scene as thumbnail
+const thumbScene = document.getElementById("scene-select").value;
+const thumbIdx = thumbScene === "random" ? 0 : parseInt(thumbScene);
+currentScene = thumbIdx;
+scenes[thumbIdx].setup();
+sceneTransitionPhase = 0;
+sceneBrightness = 1.0;
+rebuildCGRAMCache();
+reallocScanlineBuffers();
+renderFrame();
+</script>
+</body>
+</html>

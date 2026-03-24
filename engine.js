@@ -1336,7 +1336,8 @@ function updateSceneDirector(deltaMs) {
       }
       break;
   }
-}
+  } // end switch
+} // end updateSceneDirector
 
 // ============================================================
 //  SECTION 11: ENHANCED INPUT

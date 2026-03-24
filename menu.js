@@ -323,6 +323,12 @@ function getMenuItems() {
       key: "effects",
     },
     {
+      label: "CRT",
+      type: "submenu",
+      key: "crt",
+      value: () => typeof crtEnabled !== "undefined" && crtEnabled ? "ON" : "OFF",
+    },
+    {
       label: "SCREENSHOT",
       type: "action",
       action: () => {
@@ -390,6 +396,33 @@ function getSubmenuItems(key) {
             sceneTimer = 0; sceneElapsedMs = 0;
           }
         },
+      ];
+
+    case "crt":
+      if (typeof crtEnabled === "undefined") return [{ label: "NOT AVAILABLE", type: "action", action: () => {} }];
+      return [
+        { label: "CRT SHADER", type: "toggle", get: () => crtEnabled, set: v => { crtEnabled = v; } },
+        { label: "SCANLINES", type: "toggle",
+          get: () => crtSettings.scanlineIntensity > 0,
+          set: v => { crtSettings.scanlineIntensity = v ? 0.20 : 0; } },
+        { label: "PHOSPHOR MASK", type: "toggle",
+          get: () => crtSettings.phosphorIntensity > 0,
+          set: v => { crtSettings.phosphorIntensity = v ? 0.15 : 0; } },
+        { label: "BARREL CURVE", type: "toggle",
+          get: () => crtSettings.barrelDistortion > 0,
+          set: v => { crtSettings.barrelDistortion = v ? 0.04 : 0; } },
+        { label: "BLOOM", type: "toggle",
+          get: () => crtSettings.bloomIntensity > 0,
+          set: v => { crtSettings.bloomIntensity = v ? 0.30 : 0; } },
+        { label: "CHROMATIC ABR", type: "toggle",
+          get: () => crtSettings.chromaticAberration > 0,
+          set: v => { crtSettings.chromaticAberration = v ? 0.6 : 0; } },
+        { label: "VIGNETTE", type: "toggle",
+          get: () => crtSettings.vignetteIntensity > 0,
+          set: v => { crtSettings.vignetteIntensity = v ? 0.35 : 0; } },
+        { label: "FILM GRAIN", type: "toggle",
+          get: () => crtSettings.noiseIntensity > 0,
+          set: v => { crtSettings.noiseIntensity = v ? 0.04 : 0; } },
       ];
 
     default:

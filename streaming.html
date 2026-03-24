@@ -208,9 +208,9 @@ generateDitherTiles();
 currentScene = STREAM_PLAYLIST[0];
 scenes[currentScene].setup();
 
-// Streaming defaults
-sceneAutoAdvance = true;
-ghostEnabled = true;
+// Streaming defaults (URL params override via crt.js parser)
+sceneAutoAdvance = window._urlAutoAdvance != null ? window._urlAutoAdvance : true;
+ghostEnabled = window._urlGhost != null ? window._urlGhost : true;
 ghostAlpha = 0.2;
 sceneTimer = 0;
 sceneElapsedMs = 0;

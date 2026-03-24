@@ -2,20 +2,59 @@
 //  CRT POST-PROCESSING SHADER
 //  WebGL2 post-process overlay for authentic CRT phosphor look.
 //  Loads after engine.js, wraps renderFrame() automatically.
+//
+//  URL parameters (all optional):
+//    ?crt=true             Enable CRT shader (default: off)
+//    ?scanlines=0.20       Scanline darkening intensity
+//    ?phosphor=0.15        RGB aperture grille intensity
+//    ?barrel=0.04          Barrel distortion amount
+//    ?bloom=0.30           Bloom/glow intensity
+//    ?bloomRadius=1.5      Bloom sample radius
+//    ?chromatic=0.6        Chromatic aberration px shift
+//    ?vignette=0.35        Corner darkening
+//    ?noise=0.04           Film grain intensity
+//    ?scene=5              Start on specific scene index
+//    ?glitch=3             Lock to specific glitch mode (0=auto)
+//    ?ghost=true           Enable ghost frame
+//    ?autoAdvance=false    Disable auto scene advance
 // ============================================================
 
-var crtEnabled = true;
+var crtEnabled = false; // opt-in by default
 
 var crtSettings = {
-  scanlineIntensity:   0.20,   // 0 = off, 1 = full black lines
-  phosphorIntensity:   0.15,   // RGB sub-pixel aperture grille
-  barrelDistortion:    0.04,   // curvature amount
-  bloomIntensity:      0.30,   // bright pixel bleed
-  bloomRadius:         1.5,    // texel radius for blur taps
-  chromaticAberration: 0.6,    // px shift at edges
-  vignetteIntensity:   0.35,   // corner darkening
-  noiseIntensity:      0.04,   // film grain amplitude
+  scanlineIntensity:   0.20,
+  phosphorIntensity:   0.15,
+  barrelDistortion:    0.04,
+  bloomIntensity:      0.30,
+  bloomRadius:         1.5,
+  chromaticAberration: 0.6,
+  vignetteIntensity:   0.35,
+  noiseIntensity:      0.04,
 };
+
+// --- Parse URL parameters ---
+(function parseURLParams() {
+  const p = new URLSearchParams(window.location.search);
+
+  // CRT master toggle
+  if (p.has("crt")) crtEnabled = p.get("crt") !== "false" && p.get("crt") !== "0";
+
+  // CRT shader settings
+  if (p.has("scanlines"))   crtSettings.scanlineIntensity   = parseFloat(p.get("scanlines"));
+  if (p.has("phosphor"))    crtSettings.phosphorIntensity   = parseFloat(p.get("phosphor"));
+  if (p.has("barrel"))      crtSettings.barrelDistortion    = parseFloat(p.get("barrel"));
+  if (p.has("bloom"))       crtSettings.bloomIntensity      = parseFloat(p.get("bloom"));
+  if (p.has("bloomRadius")) crtSettings.bloomRadius         = parseFloat(p.get("bloomRadius"));
+  if (p.has("chromatic"))   crtSettings.chromaticAberration = parseFloat(p.get("chromatic"));
+  if (p.has("vignette"))    crtSettings.vignetteIntensity   = parseFloat(p.get("vignette"));
+  if (p.has("noise"))       crtSettings.noiseIntensity      = parseFloat(p.get("noise"));
+
+  // Engine settings (applied after boot — deferred)
+  window._urlScene = p.has("scene") ? parseInt(p.get("scene")) : null;
+  window._urlGlitch = p.has("glitch") ? parseInt(p.get("glitch")) : null;
+  window._urlGhost = p.has("ghost") ? p.get("ghost") !== "false" && p.get("ghost") !== "0" : null;
+  window._urlAutoAdvance = p.has("autoAdvance") ? p.get("autoAdvance") !== "false" && p.get("autoAdvance") !== "0" : null;
+})();
 
 (function () {
   "use strict";
@@ -377,3 +416,23 @@ var crtSettings = {
 
   console.log("CRT post-processing initialized (WebGL2).");
 })();
+
+// --- Apply deferred URL engine params (after engine has booted) ---
+// These run at script parse time, which is after engine.js boot.
+if (typeof OFFLINE_RENDER === "undefined") {
+  // Only for index.html (not streaming.html which boots manually)
+  setTimeout(() => {
+    if (window._urlScene != null && window._urlScene >= 0 && window._urlScene < scenes.length) {
+      transitionToScene(window._urlScene);
+    }
+    if (window._urlGlitch != null) {
+      glitchMode = window._urlGlitch;
+    }
+    if (window._urlGhost != null) {
+      ghostEnabled = window._urlGhost;
+    }
+    if (window._urlAutoAdvance != null) {
+      sceneAutoAdvance = window._urlAutoAdvance;
+    }
+  }, 100);
+}

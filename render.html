@@ -121,8 +121,17 @@ button:disabled { opacity: 0.4; cursor: default; }
     <select id="format-select">
       <option value="mp4">MP4 video (H.264)</option>
       <option value="webm">WebM video (VP9)</option>
-      <option value="frames">PNG frames (zip)</option>
+      <option value="frames">PNG frames (zip) — lossless, ffmpeg later</option>
     </select>
+  </div>
+  <div>
+    <label>Quality:</label>
+    <select id="quality-select">
+      <option value="max">Maximum (huge files, near-lossless)</option>
+      <option value="high" selected>High (~CRF 13)</option>
+      <option value="medium">Medium (~CRF 18)</option>
+    </select>
+    <span style="color:#555;font-size:10px;margin-left:5px">Pixel art needs high bitrate</span>
   </div>
   <div style="margin-top: 10px">
     <button id="btn-render" onclick="startRender()">RENDER</button>
@@ -367,9 +376,19 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
     return;
   }
 
-  // High bitrate for quality (~CRF 13 equivalent)
-  // CRF 13 in H.264 is roughly 80-120% of the raw pixel bandwidth
-  const bitrate = Math.max(8000000, w * h * fps * 2);
+  // Pixel art with tiny details needs very high bitrate to avoid mush.
+  // Raw uncompressed would be w * h * fps * 24 bits/pixel.
+  // Quality presets as fraction of raw:
+  const quality = document.getElementById("quality-select").value;
+  const rawBitsPerSec = w * h * fps * 24;
+  let bitrate;
+  switch (quality) {
+    case "max":    bitrate = Math.min(200000000, rawBitsPerSec * 0.5); break;  // 50% of raw, cap 200Mbps
+    case "high":   bitrate = Math.min(120000000, rawBitsPerSec * 0.25); break; // 25% of raw, cap 120Mbps
+    case "medium": bitrate = Math.min(60000000, rawBitsPerSec * 0.1); break;   // 10% of raw, cap 60Mbps
+    default:       bitrate = rawBitsPerSec * 0.25;
+  }
+  bitrate = Math.max(20000000, bitrate); // floor at 20Mbps minimum
 
   const recorder = new MediaRecorder(stream, {
     mimeType,
@@ -397,7 +416,7 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
       const pct = ((frame / totalFrames) * 100).toFixed(1);
       setProgress(parseFloat(pct));
       const mbEst = ((chunks.reduce((a, c) => a + c.size, 0)) / 1048576).toFixed(1);
-      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%) — ~${mbEst}MB`);
+      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%) — ~${mbEst}MB @ ${(bitrate/1000000).toFixed(0)}Mbps`);
       await new Promise(r => setTimeout(r, 0));
     }
   }

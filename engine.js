@@ -755,8 +755,11 @@ function glitchGhostFrame() {
 //  SECTION 10: SCENE DIRECTOR
 // ============================================================
 
-const SCENE_DURATION = 3600;  // ~60 seconds at 60fps
-const SCENE_TRANSITION_LEN = 60; // ~1 second transitions
+const SCENE_DURATION_MS = 60000;      // 60 seconds in real time
+const SCENE_TRANSITION_MS = 1000;     // 1 second transitions in real time
+let lastFrameTime = performance.now(); // for delta-time tracking
+let sceneElapsedMs = 0;               // real-time elapsed in current scene
+let transitionElapsedMs = 0;          // real-time elapsed in current transition
 
 const scenes = [
   // ---- SCENE 0: GENESIS ----
@@ -1241,7 +1244,7 @@ const scenes = [
       updateParticles();
 
       // Progressively increase fixed color (fade to black via subtraction)
-      const progress = localFrame / SCENE_DURATION;
+      const progress = Math.min(1, sceneElapsedMs / SCENE_DURATION_MS);
       fixedColor.r = Math.floor(progress * 20);
       fixedColor.g = Math.floor(progress * 20);
       fixedColor.b = Math.floor(progress * 20);
@@ -1268,66 +1271,68 @@ let pendingScene = -1;
 
 function transitionToScene(idx) {
   sceneTransitionPhase = 1; // start fade-out
-  sceneTransitionTimer = 0;
+  transitionElapsedMs = 0;
   pendingScene = idx; // don't switch yet — wait for phase 2
 }
 
-function updateSceneDirector() {
-  sceneTimer++;
+function updateSceneDirector(deltaMs) {
+  sceneTimer++; // frame counter still used by scene update() for animation
 
   switch (sceneTransitionPhase) {
     case 0: // Running
+      sceneElapsedMs += deltaMs;
       if (currentScene >= 0 && currentScene < scenes.length) {
         scenes[currentScene].update(sceneTimer);
         sceneName = scenes[currentScene].name;
       }
 
-      // Auto-advance
-      if (sceneAutoAdvance && sceneTimer >= SCENE_DURATION) {
+      // Auto-advance based on real time
+      if (sceneAutoAdvance && sceneElapsedMs >= SCENE_DURATION_MS) {
         const nextScene = (currentScene + 1) % scenes.length;
         transitionToScene(nextScene);
       }
       break;
 
-    case 1: // Fade-out
-      sceneTransitionTimer++;
-      sceneBrightness = Math.max(0, 1.0 - (sceneTransitionTimer / SCENE_TRANSITION_LEN));
-      // Increase mosaic during transition
-      mosaicSize = 1 + Math.min(15, Math.floor((sceneTransitionTimer / SCENE_TRANSITION_LEN) * 12));
+    case 1: { // Fade-out
+      transitionElapsedMs += deltaMs;
+      const t = Math.min(1, transitionElapsedMs / SCENE_TRANSITION_MS);
+      sceneBrightness = Math.max(0, 1.0 - t);
+      mosaicSize = 1 + Math.min(15, (t * 12) | 0);
 
-      if (sceneTransitionTimer >= SCENE_TRANSITION_LEN) {
+      if (transitionElapsedMs >= SCENE_TRANSITION_MS) {
         sceneTransitionPhase = 2;
-        sceneTransitionTimer = 0;
+        transitionElapsedMs = 0;
       }
       break;
+    }
 
     case 2: // Switch
       sceneBrightness = 0;
       mosaicSize = 16;
-      // Now apply the pending scene switch
       if (pendingScene >= 0) {
         currentScene = pendingScene;
         pendingScene = -1;
       }
-      // Setup new scene
       if (currentScene >= 0 && currentScene < scenes.length) {
         scenes[currentScene].setup();
       }
       sceneTimer = 0;
+      sceneElapsedMs = 0;
       sceneTransitionPhase = 3;
-      sceneTransitionTimer = 0;
+      transitionElapsedMs = 0;
       break;
 
-    case 3: // Fade-in
-      sceneTransitionTimer++;
-      sceneBrightness = Math.min(1.0, sceneTransitionTimer / SCENE_TRANSITION_LEN);
-      mosaicSize = 1 + Math.min(15, Math.floor((1 - sceneTransitionTimer / SCENE_TRANSITION_LEN) * 12));
+    case 3: { // Fade-in
+      transitionElapsedMs += deltaMs;
+      const t = Math.min(1, transitionElapsedMs / SCENE_TRANSITION_MS);
+      sceneBrightness = t;
+      mosaicSize = 1 + Math.min(15, ((1 - t) * 12) | 0);
 
-      if (sceneTransitionTimer >= SCENE_TRANSITION_LEN) {
+      if (transitionElapsedMs >= SCENE_TRANSITION_MS) {
         sceneBrightness = 1.0;
         mosaicSize = 1;
         sceneTransitionPhase = 0;
-        sceneTransitionTimer = 0;
+        transitionElapsedMs = 0;
       }
       break;
   }
@@ -1463,7 +1468,7 @@ function updateUI() {
   const intensityBar = "█".repeat(iFill) + "░".repeat(16 - iFill);
 
   // Scene progress bar
-  const sFill = Math.max(0, Math.min(12, Math.floor((sceneTimer / SCENE_DURATION) * 12)));
+  const sFill = Math.max(0, Math.min(12, Math.floor((sceneElapsedMs / SCENE_DURATION_MS) * 12)));
   const sceneBar = "█".repeat(sFill) + "░".repeat(12 - sFill);
 
   let tileMorphStr = "";
@@ -1504,6 +1509,11 @@ function updateUI() {
 
 function mainLoop() {
   try {
+  // Real-time delta
+  const now = performance.now();
+  const deltaMs = Math.min(now - lastFrameTime, 100); // cap at 100ms to avoid spiral
+  lastFrameTime = now;
+
   if (!frozen) {
     // Clear stale HDMA effects — hard cap + probabilistic cleanup
     if (hdmaEffects.length > 12) {
@@ -1515,8 +1525,8 @@ function mainLoop() {
     // Reset per-frame registers
     mosaicSize = 1;
 
-    // Scene director handles most updates now
-    updateSceneDirector();
+    // Scene director handles most updates now (real-time based)
+    updateSceneDirector(deltaMs);
 
     // Color cycling runs independently
     updateColorCycling();

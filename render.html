@@ -545,27 +545,30 @@ async function buildZip(files) {
 }
 
 // --- Init ---
+console.log("Engine loaded, scenes available:", scenes.length);
 populateScenes();
 parseURLParams();
 applyResolutionPreset();
 updateResDisplay();
 
-// Don't auto-start the live engine — just show the UI
-// The user clicks PREVIEW to see live, or RENDER to export
-resetPPU();
-generateEnhancedTiles();
-resizePPU(256, 224);
+// Show first frame as thumbnail
+try {
+  resizePPU(256, 224);
+  resetPPU();
+  generateEnhancedTiles();
 
-// Show first frame of first scene as thumbnail
-const thumbScene = document.getElementById("scene-select").value;
-const thumbIdx = thumbScene === "random" ? 0 : parseInt(thumbScene);
-currentScene = thumbIdx;
-scenes[thumbIdx].setup();
-sceneTransitionPhase = 0;
-sceneBrightness = 1.0;
-rebuildCGRAMCache();
-reallocScanlineBuffers();
-renderFrame();
+  const thumbScene = document.getElementById("scene-select").value;
+  const thumbIdx = thumbScene === "random" ? 0 : parseInt(thumbScene);
+  currentScene = thumbIdx;
+  scenes[thumbIdx].setup();
+  sceneTransitionPhase = 0;
+  sceneBrightness = 1.0;
+  rebuildCGRAMCache();
+  reallocScanlineBuffers();
+  renderFrame();
+} catch (e) {
+  console.warn("Thumbnail render failed:", e);
+}
 </script>
 </body>
 </html>

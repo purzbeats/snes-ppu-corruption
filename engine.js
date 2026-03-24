@@ -232,8 +232,8 @@ function initParticles(count, style) {
         const radius = 40 + glitchRand() * 60;
         p.x = 128 + Math.cos(angle) * radius;
         p.y = 112 + Math.sin(angle) * radius;
-        p.vx = -Math.sin(angle) * 1.5;
-        p.vy = Math.cos(angle) * 1.5;
+        p.vx = -Math.sin(angle) * 0.375;
+        p.vy = Math.cos(angle) * 0.375;
         p.tile = i * 4;
         p.palette = (i >> 2) & 7;
         p.life = 0;
@@ -764,10 +764,10 @@ const scenes = [
     },
     update(localFrame) {
       // Gentle scrolling, slowly building tile morph
-      bgScrollX[0] += 1;
-      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.005) * 4);
-      bgScrollX[1] -= 1;
-      bgScrollY[1] += 1;
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.00125) * 4);
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] += 1;
 
       glitchIntensity = Math.min(0.5, localFrame * 0.0005);
       if (localFrame % 6 === 0) tileMorphInfection();
@@ -798,9 +798,9 @@ const scenes = [
       bgCharAddr[0] = 0x2000;
     },
     update(localFrame) {
-      bgScrollY[0] += 3; // fast vertical scroll — tiles streaming down
-      bgScrollX[1] += 1;
-      bgScrollY[1] += 2;
+      if (localFrame % 4 === 0) bgScrollY[0] += 3; // fast vertical scroll — tiles streaming down
+      if (localFrame % 4 === 0) bgScrollX[1] += 1;
+      if (localFrame % 4 === 0) bgScrollY[1] += 2;
 
       updateParticles();
       if (localFrame % 4 === 0) tileMorphColumnCascade();
@@ -851,12 +851,12 @@ const scenes = [
     },
     update(localFrame) {
       // Very slow, meditative vertical scroll
-      bgScrollY[0] += 1;
-      bgScrollX[1] = Math.floor(Math.sin(localFrame * 0.003) * 8);
-      bgScrollY[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      bgScrollX[1] = Math.floor(Math.sin(localFrame * 0.00075) * 8);
+      if (localFrame % 4 === 0) bgScrollY[1] -= 1;
 
       // Mosaic breathing
-      mosaicSize = 1 + Math.floor(Math.abs(Math.sin(localFrame * 0.008)) * 3);
+      mosaicSize = 1 + Math.floor(Math.abs(Math.sin(localFrame * 0.002)) * 3);
 
       // Gentle tile morphing — splicing creates stained glass breeding
       if (localFrame % 8 === 0) tileMorphGenomeSplice();
@@ -890,16 +890,16 @@ const scenes = [
       bgCharAddr[1] = 0x0000;
     },
     update(localFrame) {
-      bgScrollX[0] += 3; // fast horizontal
-      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.02) * 16);
-      bgScrollX[1] -= 2;
-      bgScrollY[1] += 1;
+      if (localFrame % 4 === 0) bgScrollX[0] += 3; // fast horizontal
+      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.005) * 16);
+      if (localFrame % 4 === 0) bgScrollX[1] -= 2;
+      if (localFrame % 4 === 0) bgScrollY[1] += 1;
 
       // Oscillate windows
-      window1Left = Math.floor(128 + Math.sin(localFrame * 0.015) * 96);
-      window1Right = Math.floor(128 + Math.cos(localFrame * 0.012) * 96);
-      window2Left = Math.floor(128 + Math.sin(localFrame * 0.008 + 2) * 80);
-      window2Right = Math.floor(128 + Math.cos(localFrame * 0.01 + 1) * 80);
+      window1Left = Math.floor(128 + Math.sin(localFrame * 0.00375) * 96);
+      window1Right = Math.floor(128 + Math.cos(localFrame * 0.003) * 96);
+      window2Left = Math.floor(128 + Math.sin(localFrame * 0.002 + 2) * 80);
+      window2Right = Math.floor(128 + Math.cos(localFrame * 0.0025 + 1) * 80);
 
       updateParticles();
 
@@ -950,13 +950,13 @@ const scenes = [
     },
     update(localFrame) {
       // Slow rotation of the ground plane
-      const angle = localFrame * 0.003;
+      const angle = localFrame * 0.00075;
       m7a = Math.cos(angle);
       m7b = Math.sin(angle) * 0.3;
       m7c = -Math.sin(angle) * 0.3;
       m7d = Math.cos(angle);
-      m7hofs = Math.floor(Math.sin(localFrame * 0.005) * 50);
-      m7vofs += 2;
+      m7hofs = Math.floor(Math.sin(localFrame * 0.00125) * 50);
+      if (localFrame % 4 === 0) m7vofs += 2;
 
       updateParticles();
 
@@ -991,8 +991,8 @@ const scenes = [
       bgCharAddr[1] = 0x4000;
     },
     update(localFrame) {
-      bgScrollX[0] = Math.floor(Math.sin(localFrame * 0.007) * 32);
-      bgScrollY[0] = Math.floor(Math.cos(localFrame * 0.005) * 32);
+      bgScrollX[0] = Math.floor(Math.sin(localFrame * 0.00175) * 32);
+      bgScrollY[0] = Math.floor(Math.cos(localFrame * 0.00125) * 32);
       bgScrollX[1] = -bgScrollX[0];
       bgScrollY[1] = -bgScrollY[0];
 
@@ -1052,12 +1052,12 @@ const scenes = [
       }
     },
     update(localFrame) {
-      bgScrollY[0] += 1; // slow descent into ruins
-      bgScrollX[1] = Math.floor(Math.sin(localFrame * 0.004) * 16);
-      bgScrollY[1] += 2;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1; // slow descent into ruins
+      bgScrollX[1] = Math.floor(Math.sin(localFrame * 0.001) * 16);
+      if (localFrame % 4 === 0) bgScrollY[1] += 2;
 
       // Window slowly reveals/conceals columns
-      window1Left = Math.floor(Math.abs(Math.sin(localFrame * 0.006)) * 128);
+      window1Left = Math.floor(Math.abs(Math.sin(localFrame * 0.0015)) * 128);
       window1Right = 255 - window1Left;
 
       // Tiles crumble via DMA misfire
@@ -1094,10 +1094,10 @@ const scenes = [
     },
     update(localFrame) {
       // Everything at maximum chaos
-      bgScrollX[0] += 2 + Math.floor(Math.sin(localFrame * 0.1) * 4);
-      bgScrollY[0] += Math.floor(Math.cos(localFrame * 0.07) * 3);
-      bgScrollX[1] -= 3;
-      bgScrollY[1] += 2;
+      if (localFrame % 4 === 0) bgScrollX[0] += 2 + Math.floor(Math.sin(localFrame * 0.025) * 4);
+      if (localFrame % 4 === 0) bgScrollY[0] += Math.floor(Math.cos(localFrame * 0.0175) * 3);
+      if (localFrame % 4 === 0) bgScrollX[1] -= 3;
+      if (localFrame % 4 === 0) bgScrollY[1] += 2;
 
       updateParticles();
 
@@ -1115,10 +1115,10 @@ const scenes = [
       if (localFrame % 25 === 0) glitchHDMA();
 
       // Window chaos
-      window1Left = Math.floor(128 + Math.sin(localFrame * 0.05) * 120);
-      window1Right = Math.floor(128 + Math.cos(localFrame * 0.04) * 120);
-      window2Left = Math.floor(128 + Math.sin(localFrame * 0.03 + 1) * 100);
-      window2Right = Math.floor(128 + Math.cos(localFrame * 0.035 + 2) * 100);
+      window1Left = Math.floor(128 + Math.sin(localFrame * 0.0125) * 120);
+      window1Right = Math.floor(128 + Math.cos(localFrame * 0.01) * 120);
+      window2Left = Math.floor(128 + Math.sin(localFrame * 0.0075 + 1) * 100);
+      window2Right = Math.floor(128 + Math.cos(localFrame * 0.00875 + 2) * 100);
     }
   },
 
@@ -1175,7 +1175,7 @@ const scenes = [
     },
     update(localFrame) {
       // Counter-rotating scroll creates kaleidoscope
-      const angle = localFrame * 0.004;
+      const angle = localFrame * 0.001;
       bgScrollX[0] = Math.floor(Math.cos(angle) * 32);
       bgScrollY[0] = Math.floor(Math.sin(angle) * 32);
       bgScrollX[1] = Math.floor(Math.cos(-angle * 0.7) * 24);
@@ -1187,7 +1187,7 @@ const scenes = [
       if (localFrame % 30 === 0) tileMorphWanderingTiles();
 
       // Mosaic pulse
-      mosaicSize = 1 + Math.floor(Math.abs(Math.sin(localFrame * 0.015)) * 2);
+      mosaicSize = 1 + Math.floor(Math.abs(Math.sin(localFrame * 0.00375)) * 2);
     }
   },
 
@@ -1213,10 +1213,10 @@ const scenes = [
       bgCharAddr[1] = 0x4000;
     },
     update(localFrame) {
-      bgScrollX[0] += 1;
-      bgScrollY[0] += 1;
-      bgScrollX[1] -= 1;
-      bgScrollY[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] -= 1;
 
       updateParticles();
 

@@ -5,7 +5,7 @@
 //  types that push the PPU simulation into full visual chaos.
 // ============================================================
 
-const ENGINE_LOADED = true;
+if (typeof ENGINE_LOADED === "undefined") { var ENGINE_LOADED = true; }
 
 // ============================================================
 //  SECTION 1: NEW PPU STATE

@@ -326,9 +326,10 @@ var crtSettings = {
     syncSize();
     frameTime += 1.0 / 60.0;
 
-    // Upload source canvas as texture
+    // Upload source canvas as texture (flip Y to match canvas 2D origin)
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, srcCanvas);
 
     // Set uniforms

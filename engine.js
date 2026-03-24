@@ -756,7 +756,7 @@ function glitchGhostFrame() {
 // ============================================================
 
 const SCENE_DURATION = 1200;  // ~20 seconds at 60fps
-const SCENE_TRANSITION_LEN = 150; // ~2.5 second transitions
+const SCENE_TRANSITION_LEN = 60; // ~1 second transitions
 
 const scenes = [
   // ---- SCENE 0: GENESIS ----

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SNES PPU Corruption — Streaming Background</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: #000;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: monospace;
+  cursor: none;
+}
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+</style>
+</head>
+<body>
+<!-- Hidden elements engine.js expects -->
+<div id="ui" style="display:none"></div>
+<div id="controls" style="display:none"></div>
+<canvas id="screen" width="256" height="224"></canvas>
+
+<!-- Prevent engine.js auto-boot -->
+<script>var OFFLINE_RENDER = true;</script>
+
+<script src="ppu.js"></script>
+<script src="engine.js"></script>
+<script src="landscape.js"></script>
+
+<script>
+// ============================================================
+//  STREAMING MODE
+//  Smooth, subtle, ambient. Zero input. Just beauty on the TV.
+//  Longer scenes, gentler transitions, capped corruption,
+//  ghost frame trails, curated playlist.
+// ============================================================
+
+// --- Timing ---
+const STREAM_SCENE_MS = 35000;       // 35 seconds per scene
+const STREAM_TRANSITION_MS = 2500;   // 2.5 second crossfade
+const STREAM_GLITCH_CAP = 0.3;       // max corruption intensity
+
+// --- Curated playlist ---
+// Beautiful, smooth scenes. Skip harsh/chaotic ones
+// (GLITCH STORM, SHATTER, STATIC, RAVE, DISSOLUTION, THERMAL).
+const STREAM_PLAYLIST = [];
+
+// Scene names to skip
+const SKIP_SCENES = new Set([
+  "GLITCH STORM", "SHATTER", "STATIC", "RAVE",
+  "DISSOLUTION", "THERMAL", "GRID"
+]);
+
+// Build playlist from all available scenes
+for (let i = 0; i < scenes.length; i++) {
+  if (!SKIP_SCENES.has(scenes[i].name)) {
+    STREAM_PLAYLIST.push(i);
+  }
+}
+
+// Shuffle using Fisher-Yates
+function shufflePlaylist() {
+  for (let i = STREAM_PLAYLIST.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [STREAM_PLAYLIST[i], STREAM_PLAYLIST[j]] = [STREAM_PLAYLIST[j], STREAM_PLAYLIST[i]];
+  }
+}
+shufflePlaylist();
+
+let playlistIndex = 0;
+
+function nextStreamScene() {
+  playlistIndex = (playlistIndex + 1) % STREAM_PLAYLIST.length;
+  // Reshuffle when we loop back to start
+  if (playlistIndex === 0) shufflePlaylist();
+  return STREAM_PLAYLIST[playlistIndex];
+}
+
+// --- Override scene director with streaming timing ---
+// Smoother transitions: no mosaic pixelation, just a clean brightness fade.
+updateSceneDirector = function(deltaMs) {
+  sceneTimer++;
+
+  switch (sceneTransitionPhase) {
+    case 0: // Running
+      sceneElapsedMs += deltaMs;
+      if (currentScene >= 0 && currentScene < scenes.length) {
+        scenes[currentScene].update(sceneTimer);
+        sceneName = scenes[currentScene].name;
+      }
+
+      // Cap glitch intensity for smoothness
+      if (glitchIntensity > STREAM_GLITCH_CAP) {
+        glitchIntensity = STREAM_GLITCH_CAP;
+      }
+
+      // Auto-advance at streaming pace
+      if (sceneElapsedMs >= STREAM_SCENE_MS) {
+        transitionToScene(nextStreamScene());
+      }
+      break;
+
+    case 1: { // Fade-out (smooth, no mosaic)
+      transitionElapsedMs += deltaMs;
+      const t = Math.min(1, transitionElapsedMs / STREAM_TRANSITION_MS);
+      // Smooth ease-out curve
+      const ease = t * t;
+      sceneBrightness = Math.max(0, 1.0 - ease);
+      // NO mosaic — keep it clean
+
+      if (transitionElapsedMs >= STREAM_TRANSITION_MS) {
+        sceneTransitionPhase = 2;
+        transitionElapsedMs = 0;
+      }
+      break;
+    }
+
+    case 2: // Switch
+      sceneBrightness = 0;
+      mosaicSize = 1;
+      if (pendingScene >= 0) {
+        currentScene = pendingScene;
+        pendingScene = -1;
+      }
+      if (currentScene >= 0 && currentScene < scenes.length) {
+        scenes[currentScene].setup();
+        // Force streaming-friendly defaults after scene setup
+        ghostEnabled = true;
+        ghostAlpha = 0.2;
+      }
+      sceneTimer = 0;
+      sceneElapsedMs = 0;
+      sceneTransitionPhase = 3;
+      transitionElapsedMs = 0;
+      break;
+
+    case 3: { // Fade-in (smooth)
+      transitionElapsedMs += deltaMs;
+      const t = Math.min(1, transitionElapsedMs / STREAM_TRANSITION_MS);
+      // Smooth ease-in curve
+      const ease = 1 - (1 - t) * (1 - t);
+      sceneBrightness = ease;
+
+      if (transitionElapsedMs >= STREAM_TRANSITION_MS) {
+        sceneBrightness = 1.0;
+        mosaicSize = 1;
+        sceneTransitionPhase = 0;
+        transitionElapsedMs = 0;
+      }
+      break;
+    }
+  }
+};
+
+// --- Override main loop (no UI updates, no input) ---
+mainLoop = function() {
+  try {
+    const now = performance.now();
+    const deltaMs = Math.min(now - lastFrameTime, 100);
+    lastFrameTime = now;
+
+    // Clear stale HDMA
+    if (hdmaEffects.length > 8) {
+      hdmaEffects = hdmaEffects.slice(-3);
+    } else if (glitchRand() < 0.05) {
+      hdmaEffects = hdmaEffects.slice(-2);
+    }
+
+    mosaicSize = 1; // streaming mode never uses mosaic
+
+    updateSceneDirector(deltaMs);
+    updateColorCycling();
+
+    // Gentle glitch application — fewer, softer
+    if (glitchMode > 0 && sceneTransitionPhase === 0) {
+      const idx = glitchMode - 1;
+      if (idx < GLITCH_FNS.length) {
+        GLITCH_FNS[idx]();
+      }
+    }
+
+    renderFrame();
+    frameCount++;
+  } catch (e) {
+    console.warn("Frame error:", e);
+  }
+  requestAnimationFrame(mainLoop);
+};
+
+// --- Boot ---
+applyFullscreenResolution();
+resetPPU();
+generateEnhancedTiles();
+
+// Start with first scene from shuffled playlist
+currentScene = STREAM_PLAYLIST[0];
+scenes[currentScene].setup();
+
+// Streaming defaults
+sceneAutoAdvance = true;
+ghostEnabled = true;
+ghostAlpha = 0.2;
+sceneTimer = 0;
+sceneElapsedMs = 0;
+transitionElapsedMs = 0;
+sceneTransitionPhase = 3; // fade in from black
+sceneBrightness = 0;
+lastFrameTime = performance.now();
+
+mainLoop();
+
+// --- Click to fullscreen (for TV setup) ---
+document.addEventListener("click", () => {
+  const el = document.documentElement;
+  const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (rfs && !document.fullscreenElement) rfs.call(el);
+});
+
+// Refit on resize/fullscreen
+document.addEventListener("fullscreenchange", () => {
+  applyFullscreenResolution();
+});
+window.addEventListener("resize", () => {
+  applyFullscreenResolution();
+});
+</script>
+</body>
+</html>

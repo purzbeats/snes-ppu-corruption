@@ -43,6 +43,7 @@ function resizePPU(w, h) {
   canvas.height = h;
   imgData = ctx.createImageData(w, h);
   fb = new Uint32Array(imgData.data.buffer);
+  reallocScanlineBuffers();
 }
 
 // --- PPU State ---
@@ -91,12 +92,13 @@ let lastGlitchBurst = 0;
 let autoGlitch = true;
 
 // --- 15-bit SNES color conversion ---
+// PERF: snesColorToRGB now returns packed RGBA uint32 (no object allocation)
 function snesColorToRGB(lo, hi) {
   const w = lo | (hi << 8);
   const r = (w & 0x1F) << 3;
   const g = ((w >> 5) & 0x1F) << 3;
   const b = ((w >> 10) & 0x1F) << 3;
-  return { r, g, b };
+  return 0xFF000000 | (b << 16) | (g << 8) | r;
 }
 
 function rgbToSnesColor(r, g, b) {
@@ -108,6 +110,33 @@ function rgbToSnesColor(r, g, b) {
 
 function packRGBA(r, g, b, a = 255) {
   return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
+// --- CGRAM cache: pre-computed packed RGBA for each palette entry ---
+// Rebuilt once per frame — avoids per-pixel snesColorToRGB calls
+const cgramCache = new Uint32Array(256);
+
+function rebuildCGRAMCache() {
+  for (let i = 0; i < 256; i++) {
+    const lo = CGRAM[i * 2];
+    const hi = CGRAM[i * 2 + 1];
+    const w = lo | (hi << 8);
+    const r = (w & 0x1F) << 3;
+    const g = ((w >> 5) & 0x1F) << 3;
+    const b = ((w >> 10) & 0x1F) << 3;
+    cgramCache[i] = 0xFF000000 | (b << 16) | (g << 8) | r;
+  }
+}
+
+// Pre-allocated scanline buffers — reused every scanline, zero GC pressure
+let _lineBuffer = new Uint32Array(1024);
+let _priorityBuffer = new Int8Array(1024);
+
+function reallocScanlineBuffers() {
+  if (_lineBuffer.length < SCREEN_W) {
+    _lineBuffer = new Uint32Array(SCREEN_W + 64);
+    _priorityBuffer = new Int8Array(SCREEN_W + 64);
+  }
 }
 
 // --- Initialize VRAM with tile patterns ---
@@ -340,10 +369,9 @@ function decodeTilePixel(charBase, tileIdx, px, py, hFlip, vFlip) {
   return bp0 | (bp1 << 1) | (bp2 << 2) | (bp3 << 3);
 }
 
-// --- Get color from CGRAM ---
+// --- Get color from CGRAM (returns packed RGBA from cache) ---
 function getCGRAMColor(paletteIdx, colorIdx) {
-  const addr = (paletteIdx * 16 + colorIdx) * 2;
-  return snesColorToRGB(CGRAM[addr & 0x1FF], CGRAM[(addr + 1) & 0x1FF]);
+  return cgramCache[(paletteIdx * 16 + colorIdx) & 0xFF];
 }
 
 // --- Render a BG layer scanline ---
@@ -396,21 +424,19 @@ function renderMode7Scanline(scanline, lineBuffer, priorityBuffer) {
   const cy = m7y;
   const cx = m7x;
 
+  // PERF: pre-check matrix sanity once per scanline, not per pixel
+  if (!isFinite(m7a) || !isFinite(m7b) || !isFinite(m7c) || !isFinite(m7d)) return;
+
+  // PERF: pre-compute row constants
+  const sy = scanline - cy + m7vofs;
+  const rowBaseX = m7b * sy + cx;
+  const rowBaseY = m7d * sy + cy;
+
   for (let screenX = 0; screenX < SCREEN_W; screenX++) {
-    // Apply affine transform
     const sx = screenX - cx + m7hofs;
-    const sy = scanline - cy + m7vofs;
-    let texX = m7a * sx + m7b * sy + cx;
-    let texY = m7c * sx + m7d * sy + cy;
-
-    // Guard against NaN/Infinity from corrupted matrix
-    if (!isFinite(texX) || !isFinite(texY)) continue;
-    texX = Math.floor(texX);
-    texY = Math.floor(texY);
-
-    // Wrap or clamp
-    texX = ((texX % 1024) + 1024) % 1024;
-    texY = ((texY % 1024) + 1024) % 1024;
+    // PERF: use bitwise floor + AND wrap instead of Math.floor + modulo
+    const texX = (rowBaseX + m7a * sx + 0x100000) & 0x3FF; // +offset to ensure positive before mask
+    const texY = (rowBaseY + m7c * sx + 0x100000) & 0x3FF;
 
     // Get tile from mode 7 tilemap (128×128 tiles = 1024×1024 pixels)
     const tmx = (texX >> 3) & 127;
@@ -463,71 +489,55 @@ function applyMosaic(lineBuffer) {
   }
 }
 
-// --- Apply color math ---
-function applyColorMath(color) {
-  if (colorMathMode === 0) return color;
-  let { r, g, b } = color;
+// --- Apply color math (packed uint32 in/out, no allocations) ---
+function applyColorMath(packed) {
+  if (colorMathMode === 0) return packed;
+  let r = packed & 0xFF;
+  let g = (packed >> 8) & 0xFF;
+  let b = (packed >> 16) & 0xFF;
   const fr = fixedColor.r << 3;
   const fg = fixedColor.g << 3;
-  const fb = fixedColor.b << 3;
+  const fbl = fixedColor.b << 3;
   switch (colorMathMode) {
-    case 1: // add
-      r = Math.min(255, r + fr);
-      g = Math.min(255, g + fg);
-      b = Math.min(255, b + fb);
-      break;
-    case 2: // subtract
-      r = Math.max(0, r - fr);
-      g = Math.max(0, g - fg);
-      b = Math.max(0, b - fb);
-      break;
-    case 3: // average
-      r = (r + fr) >> 1;
-      g = (g + fg) >> 1;
-      b = (b + fb) >> 1;
-      break;
+    case 1: r += fr; g += fg; b += fbl; break;
+    case 2: r -= fr; g -= fg; b -= fbl; break;
+    case 3: r = (r + fr) >> 1; g = (g + fg) >> 1; b = (b + fbl) >> 1; break;
   }
-  return { r, g, b };
+  // Clamp using bitwise (no Math.min/max)
+  r = r < 0 ? 0 : r > 255 ? 255 : r;
+  g = g < 0 ? 0 : g > 255 ? 255 : g;
+  b = b < 0 ? 0 : b > 255 ? 255 : b;
+  return 0xFF000000 | (b << 16) | (g << 8) | r;
 }
 
-// --- Render a full frame ---
+// --- Render a full frame (standalone fallback — engine.js overrides this) ---
 function renderFrame() {
-  const backdropColor = getCGRAMColor(0, 0);
+  rebuildCGRAMCache();
+  reallocScanlineBuffers();
+  const lineBuffer = _lineBuffer;
+  const priorityBuffer = _priorityBuffer;
+  const backdropColor = cgramCache[0];
 
   for (let scanline = 0; scanline < SCREEN_H; scanline++) {
-    // Apply HDMA
     applyHDMAEffects(scanline);
+    lineBuffer.fill(backdropColor, 0, SCREEN_W);
+    priorityBuffer.fill(-1, 0, SCREEN_W);
 
-    // Line buffers
-    const lineBuffer = new Array(SCREEN_W);
-    const priorityBuffer = new Int8Array(SCREEN_W).fill(-1);
-
-    // Fill with backdrop
-    for (let x = 0; x < SCREEN_W; x++) {
-      lineBuffer[x] = { ...backdropColor };
-    }
-
-    // Render BG layers back to front based on mode
     if (ppuMode === 7) {
       renderMode7Scanline(scanline, lineBuffer, priorityBuffer);
     } else {
-      // Standard tile modes: render BG layers
       for (let bg = 3; bg >= 0; bg--) {
         renderBGScanline(bg, scanline, lineBuffer, priorityBuffer);
       }
     }
 
-    // Apply mosaic
     applyMosaic(lineBuffer);
 
-    // Write to framebuffer with color math
     const fbOffset = scanline * SCREEN_W;
     for (let x = 0; x < SCREEN_W; x++) {
-      let color = lineBuffer[x];
-      if (colorMathMode !== 0) {
-        color = applyColorMath(color);
-      }
-      fb[fbOffset + x] = packRGBA(color.r, color.g, color.b);
+      let px = lineBuffer[x];
+      if (colorMathMode !== 0) px = applyColorMath(px);
+      fb[fbOffset + x] = px;
     }
   }
 

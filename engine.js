@@ -482,31 +482,51 @@ function applyWindowMask(screenX, scanline) {
 
 // Override the original renderFrame with enhanced version
 function renderFrame() {
+  // PERF: rebuild CGRAM cache once per frame (256 entries)
+  rebuildCGRAMCache();
+  reallocScanlineBuffers();
+
   // Animated raster offset
-  if (rasterEnabled) {
-    rasterOffset += 0.5;
+  const rasterOfs = rasterEnabled ? (rasterOffset = rasterOffset + 0.5, rasterOffset | 0) : 0;
+
+  // PERF: pre-compute constants outside scanline loop
+  const doColorMath = colorMathMode !== 0;
+  const brFast = sceneBrightness >= 1.0;
+  const br256 = brFast ? 256 : Math.max(0, (sceneBrightness * 256) | 0);
+  const doWindow = windowEnabled;
+  const BLACK = 0xFF000000;
+  const windowColor = doWindow && windowMaskAction === 1
+    ? (0xFF000000 | ((fixedColor.b << 3) << 16) | ((fixedColor.g << 3) << 8) | (fixedColor.r << 3))
+    : BLACK;
+
+  // PERF: pre-compute backdrop once
+  let backdropPacked;
+  if (!rasterEnabled) {
+    backdropPacked = cgramCache[0]; // palette 0, color 0
   }
+
+  // Reuse pre-allocated buffers
+  const lineBuffer = _lineBuffer;
+  const priorityBuffer = _priorityBuffer;
 
   for (let scanline = 0; scanline < SCREEN_H; scanline++) {
     applyHDMAEffects(scanline);
 
-    const lineBuffer = new Array(SCREEN_W);
-    const priorityBuffer = new Int8Array(SCREEN_W).fill(-1);
-
-    // Backdrop: either raster bar gradient or CGRAM color 0
+    // Fill backdrop (packed uint32, no object allocation)
     if (rasterEnabled) {
-      const rIdx = (scanline + Math.floor(rasterOffset)) % SCREEN_H;
+      const rIdx = (scanline + rasterOfs) % SCREEN_H;
       const rCol = rasterColors[rIdx];
-      const bgColor = snesColorToRGB(rCol & 0xFF, (rCol >> 8) & 0xFF);
-      for (let x = 0; x < SCREEN_W; x++) {
-        lineBuffer[x] = { ...bgColor };
-      }
+      // Convert SNES 15-bit to packed RGBA inline
+      const rw = rCol & 0x7FFF;
+      const rpacked = 0xFF000000 |
+        (((rw >> 10) & 0x1F) << 19) |
+        (((rw >> 5) & 0x1F) << 11) |
+        ((rw & 0x1F) << 3);
+      lineBuffer.fill(rpacked, 0, SCREEN_W);
     } else {
-      const backdropColor = getCGRAMColor(0, 0);
-      for (let x = 0; x < SCREEN_W; x++) {
-        lineBuffer[x] = { ...backdropColor };
-      }
+      lineBuffer.fill(backdropPacked, 0, SCREEN_W);
     }
+    priorityBuffer.fill(-1, 0, SCREEN_W);
 
     // BG layers
     if (ppuMode === 7) {
@@ -520,74 +540,71 @@ function renderFrame() {
     // Sprites
     renderSpriteScanline(scanline, lineBuffer, priorityBuffer);
 
-    // Mosaic
+    // Mosaic (works on uint32 values directly)
     applyMosaic(lineBuffer);
 
-    // Window masking
-    if (windowEnabled) {
+    // Window masking (packed — no object allocation)
+    if (doWindow) {
       for (let x = 0; x < SCREEN_W; x++) {
         if (applyWindowMask(x, scanline)) {
           switch (windowMaskAction) {
-            case 0: // clip to black
-              lineBuffer[x] = { r: 0, g: 0, b: 0 };
-              break;
-            case 1: // clip to fixed color
-              lineBuffer[x] = {
-                r: fixedColor.r << 3,
-                g: fixedColor.g << 3,
-                b: fixedColor.b << 3
-              };
-              break;
-            case 2: // invert
-              lineBuffer[x] = {
-                r: 255 - lineBuffer[x].r,
-                g: 255 - lineBuffer[x].g,
-                b: 255 - lineBuffer[x].b
-              };
-              break;
+            case 0: lineBuffer[x] = BLACK; break;
+            case 1: lineBuffer[x] = windowColor; break;
+            case 2: lineBuffer[x] = lineBuffer[x] ^ 0x00FFFFFF; break; // invert RGB
           }
         }
       }
     }
 
-    // Write to framebuffer with color math + brightness
+    // Write to framebuffer
     const fbOffset = scanline * SCREEN_W;
-    for (let x = 0; x < SCREEN_W; x++) {
-      let color = lineBuffer[x];
-      if (colorMathMode !== 0) {
-        color = applyColorMath(color);
+    if (!doColorMath && brFast) {
+      // PERF: fast path — direct copy, no per-pixel math
+      for (let x = 0; x < SCREEN_W; x++) {
+        fb[fbOffset + x] = lineBuffer[x];
       }
-
-      // Apply scene brightness for transitions (clamp to valid range)
-      const br = Math.max(0, Math.min(1, sceneBrightness));
-      let r = Math.max(0, Math.min(255, Math.floor(color.r * br)));
-      let g = Math.max(0, Math.min(255, Math.floor(color.g * br)));
-      let b = Math.max(0, Math.min(255, Math.floor(color.b * br)));
-
-      fb[fbOffset + x] = packRGBA(r, g, b);
+    } else {
+      for (let x = 0; x < SCREEN_W; x++) {
+        let px = lineBuffer[x];
+        if (doColorMath) px = applyColorMath(px);
+        if (!brFast) {
+          // Integer brightness: (channel * br256) >> 8
+          const r = ((px & 0xFF) * br256) >> 8;
+          const g = (((px >> 8) & 0xFF) * br256) >> 8;
+          const b = (((px >> 16) & 0xFF) * br256) >> 8;
+          px = 0xFF000000 | (b << 16) | (g << 8) | r;
+        }
+        fb[fbOffset + x] = px;
+      }
     }
   }
 
-  // Ghost frame overlay (phosphor persistence)
+  // Ghost frame overlay (PERF: integer alpha, no Math.floor/Math.max calls)
   if (ghostEnabled && ghostBuffer) {
-    // Clamp alpha and use decayed previous frame to prevent wash-out
-    const a = Math.min(0.5, Math.max(0, ghostAlpha));
-    for (let i = 0; i < fb.length; i++) {
+    const a256 = Math.min(128, Math.max(0, (ghostAlpha * 256) | 0));
+    const totalPixels = SCREEN_W * SCREEN_H;
+    for (let i = 0; i < totalPixels; i++) {
       const curr = fb[i];
       const prev = ghostBuffer[i];
-      const cr = curr & 0xFF, cg = (curr >> 8) & 0xFF, cb = (curr >> 16) & 0xFF;
-      const pr = prev & 0xFF, pg = (prev >> 8) & 0xFF, pb = (prev >> 16) & 0xFF;
-      // Blend: use max of current or decayed previous (prevents additive blow-out)
-      fb[i] = packRGBA(
-        Math.max(cr, Math.floor(pr * a)),
-        Math.max(cg, Math.floor(pg * a)),
-        Math.max(cb, Math.floor(pb * a))
-      );
+      // Decay previous frame and max with current
+      const pr = ((prev & 0xFF) * a256) >> 8;
+      const pg = (((prev >> 8) & 0xFF) * a256) >> 8;
+      const pb = (((prev >> 16) & 0xFF) * a256) >> 8;
+      const cr = curr & 0xFF;
+      const cg = (curr >> 8) & 0xFF;
+      const cb = (curr >> 16) & 0xFF;
+      fb[i] = 0xFF000000 |
+        (((cb > pb ? cb : pb)) << 16) |
+        (((cg > pg ? cg : pg)) << 8) |
+        ((cr > pr ? cr : pr));
     }
   }
   if (ghostEnabled) {
-    if (!ghostBuffer) ghostBuffer = new Uint32Array(fb.length);
-    ghostBuffer.set(fb);
+    const totalPixels = SCREEN_W * SCREEN_H;
+    if (!ghostBuffer || ghostBuffer.length < totalPixels) {
+      ghostBuffer = new Uint32Array(totalPixels);
+    }
+    ghostBuffer.set(fb.subarray(0, totalPixels));
   }
 
   ctx.putImageData(imgData, 0, 0);
@@ -1517,7 +1534,8 @@ function mainLoop() {
     frameCount++;
   }
 
-  updateUI();
+  // PERF: throttle UI updates — DOM innerHTML is expensive
+  if (frameCount % 10 === 0) updateUI();
   } catch (e) {
     // Don't let a single frame error kill the animation loop
     console.warn("Frame error:", e);

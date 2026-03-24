@@ -215,6 +215,35 @@ Self-contained page with its own UI. Loads ppu.js + engine.js with `OFFLINE_REND
 - Scene selection, duration, FPS, resolution, format, quality controls
 - URL params for headless use: `?scene=0&duration=30&fps=60&auto=1`
 
+## Menu System (menu.js)
+
+SNES-style bitmap font menu rendered directly to the PPU framebuffer as an overlay. Designed for CRT installations with PS5/modern game controllers.
+
+### Architecture
+- 8x8 1-bpp bitmap font covering ASCII 32-126 + custom glyphs (arrows, box drawing, indicators)
+- Renders to `fb` array after PPU renderFrame, before putImageData
+- Wraps `renderFrame` via function reassignment (no modification to engine.js)
+- Separate RAF loop for gamepad polling (works even when frozen)
+- Keyboard capture-phase listener intercepts nav keys when menu is open
+
+### Controller Mapping (PS5 DualSense / Standard Gamepad)
+- **Always active**: Options=menu, L1/R1=prev/next scene, Triangle=glitch burst, Square=screenshot, L2/R2=cycle glitch
+- **Menu open**: D-pad/stick=navigate, Cross=select, Circle=back
+- Keyboard: Escape/Tab=menu, arrows=navigate, Enter=select, Backspace=back
+
+### Menu Structure
+- `getMenuItems()` returns main menu items (Scene, Glitch, Effects, Screenshot, Fullscreen)
+- `getSubmenuItems(key)` returns submenu items dynamically
+- Items can be: action, submenu, or toggle types
+- Add new menu items by extending these functions
+
+### Font System
+- `FONT_8x8` flat Uint8Array, (charCode - 32) * 8 = offset
+- Custom glyphs at codes 128+: ▶(128), ●(129), ○(130), ■(131), □(132), ◀(133), ▲(134), ▼(135), box drawing(136-143)
+- `drawGlyph(charCode, x, y, color)` — single character
+- `drawText(str, x, y, color, shadow)` — string with optional drop shadow
+- `darkenRect(x, y, w, h, amount)` — semi-transparent panel background
+
 ## Creative Direction
 
 This is generative art, not a utility. The goal is **controlled beautiful chaos** — corruption that evolves, interacts, and surprises. The most interesting effects come from:

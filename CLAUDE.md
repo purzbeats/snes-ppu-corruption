@@ -13,7 +13,8 @@ Generative art engine simulating the Super Nintendo PPU with controlled corrupti
 
 - `ppu.js` — PPU simulation, VRAM/CGRAM/OAM, rendering pipeline, 10 glitch algorithms, tile morph system
 - `engine.js` — 25 scenes, scene director, sprites, windows, ghost frame, raster bars, color cycling, UI
-- `index.html` — Live interactive viewer
+- `menu.js` — SNES bitmap font menu system, gamepad (PS5/Xbox) support, controller mapping
+- `index.html` — Live interactive viewer (loads ppu.js → engine.js → menu.js)
 - `render.html` — Offline video export (MP4/WebM/PNG)
 
 ## Conventions

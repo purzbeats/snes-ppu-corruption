@@ -175,6 +175,12 @@ function generateThemedPalette(theme) {
     void: { hues: [270, 280, 290, 260, 275, 285, 295, 265], sat: 0.6, lumBase: 0.04 },
     stained: { hues: [0, 45, 90, 135, 180, 225, 270, 315], sat: 0.9, lumBase: 0.1 },
     crt: { hues: [120, 100, 80, 140, 60, 160, 40, 180], sat: 0.8, lumBase: 0.02 },
+    amber: { hues: [35, 40, 45, 30, 50, 38, 42, 33], sat: 0.6, lumBase: 0.08 },
+    synthwave: { hues: [300, 180, 280, 310, 190, 290, 320, 170], sat: 0.9, lumBase: 0.06 },
+    moss: { hues: [90, 110, 130, 70, 100, 120, 140, 150], sat: 0.55, lumBase: 0.04 },
+    infrared: { hues: [0, 10, 20, 30, 40, 50, 15, 5], sat: 0.95, lumBase: 0.05 },
+    midnight: { hues: [230, 240, 250, 220, 260, 235, 245, 225], sat: 0.5, lumBase: 0.02 },
+    coral: { hues: [5, 10, 15, 20, 25, 30, 0, 8], sat: 0.85, lumBase: 0.12 },
   };
 
   const t = themes[theme] || themes.ocean;
@@ -373,6 +379,24 @@ function initColorCycling(preset) {
       colorCycleRanges.push({ palIdx: 3, startCol: 1, endCol: 15, speed: 2, counter: 0, direction: -1 });
       colorCycleRanges.push({ palIdx: 5, startCol: 1, endCol: 15, speed: 3, counter: 0, direction: 1 });
       break;
+    case "chase":
+      for (let p = 0; p < 8; p++) {
+        colorCycleRanges.push({
+          palIdx: p, startCol: 1, endCol: 15,
+          speed: 1 + p * 2, counter: 0,
+          direction: (p & 1) ? 1 : -1
+        });
+      }
+      break;
+    case "breathe":
+      for (let p = 0; p < 8; p++) {
+        colorCycleRanges.push({
+          palIdx: p, startCol: 1, endCol: 15,
+          speed: 12 + (p & 3), counter: 0,
+          direction: (p & 1) ? 1 : -1
+        });
+      }
+      break;
     case "off":
       break;
   }
@@ -441,6 +465,27 @@ function generateRasterGradient(style) {
         break;
       case "blood":
         [r, g, b] = hslToRGB(350 + t * 20, 0.85, 0.02 + (1 - t) * 0.12);
+        break;
+      case "amber":
+        [r, g, b] = hslToRGB(35 + t * 10, 0.65, 0.01 + t * 0.18);
+        break;
+      case "synthwave": {
+        const midDist = Math.abs(t - 0.5);
+        const pinkStripe = midDist < 0.05 ? 0.25 : 0;
+        const hue = 270 + t * 90; // purple to cyan
+        [r, g, b] = hslToRGB(hue, 0.8, 0.02 + t * 0.1 + pinkStripe);
+        break;
+      }
+      case "infrared": {
+        // black -> red -> orange -> yellow -> white
+        const lum = t * t * 0.35;
+        const hue = t < 0.5 ? 0 : t < 0.75 ? t * 60 : 40 + t * 20;
+        const sat = t > 0.85 ? 1.0 - (t - 0.85) * 6.0 : 0.95;
+        [r, g, b] = hslToRGB(hue, Math.max(0, sat), lum);
+        break;
+      }
+      case "midnight":
+        [r, g, b] = hslToRGB(230 + Math.sin(t * 4) * 15, 0.4, 0.005 + Math.sin(t * Math.PI) * 0.015);
         break;
       default:
         [r, g, b] = hslToRGB(t * 180 + 180, 0.6, 0.03 + t * 0.06);
@@ -1262,6 +1307,583 @@ const scenes = [
 
       // Ghost gets stronger
       ghostAlpha = 0.3 + progress * 0.4;
+    }
+  },
+
+  // ---- SCENE 10: PHOSPHOR ----
+  {
+    name: "PHOSPHOR",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateBG2Tiles();
+      generateThemedPalette("amber");
+      rasterEnabled = false;
+      initColorCycling("full");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.4;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 20 === 0) glitchDMAMisfire();
+      if (localFrame % 30 === 0) glitchVRAMBitRot();
+    }
+  },
+
+  // ---- SCENE 11: GRID ----
+  {
+    name: "GRID",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("neon");
+      generateRasterGradient("rainbow");
+      initColorCycling("split");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+
+      // Build strict grid tilemap — every 4th tile is a border, rest empty
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          const isBorder = (x % 4 === 0) || (y % 4 === 0);
+          const tileIdx = isBorder ? (192 + (x & 7) + (y & 7)) & 0xFF : 0;
+          const palette = isBorder ? ((x + y) >> 2) & 7 : 0;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 3;
+      // BG2 static
+      if (localFrame % 8 === 0) glitchBitplaneError();
+      if (localFrame % 12 === 0) glitchTilemapScramble();
+    }
+  },
+
+  // ---- SCENE 12: SYNTHWAVE ----
+  {
+    name: "SYNTHWAVE",
+    setup() {
+      ppuMode = 7;
+      bgEnabled[0] = false; bgEnabled[1] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("synthwave");
+      generateRasterGradient("synthwave");
+      initColorCycling("chase");
+      initParticles(20, "rise");
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      m7a = 1; m7b = 0; m7c = 0; m7d = 1;
+      m7x = SCREEN_W >> 1; m7y = SCREEN_H >> 1;
+      m7hofs = 0; m7vofs = 0;
+      hdmaEffects = [];
+    },
+    update(localFrame) {
+      const angle = localFrame * 0.0005;
+      m7a = Math.cos(angle);
+      m7b = Math.sin(angle) * 0.2;
+      m7c = -Math.sin(angle) * 0.2;
+      m7d = Math.cos(angle);
+      if (localFrame % 4 === 0) m7vofs += 1;
+      updateParticles();
+      if (localFrame % 15 === 0) glitchMode7();
+      if (localFrame % 20 === 0) glitchScrollOverflow();
+    }
+  },
+
+  // ---- SCENE 13: MOSS ----
+  {
+    name: "MOSS",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("moss");
+      generateRasterGradient("void");
+      initColorCycling("breathe");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.3;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] -= 1;
+      if (localFrame % 6 === 0) tileMorphInfection();
+    }
+  },
+
+  // ---- SCENE 14: INTERFERENCE ----
+  {
+    name: "INTERFERENCE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateBG2Tiles();
+      generateEnhancedTiles();
+      generateThemedPalette("ice");
+      rasterEnabled = false;
+      initColorCycling("full");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 2;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] += 3;
+      if (localFrame % 10 === 0) tileMorphGenomeSplice();
+      if (localFrame % 15 === 0) tileMorphWanderingTiles();
+    }
+  },
+
+  // ---- SCENE 15: THERMAL ----
+  {
+    name: "THERMAL",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("infrared");
+      generateRasterGradient("infrared");
+      initColorCycling("pulse");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 1;
+      fixedColor = { r: 4, g: 1, b: 0 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      fixedColor.r = Math.floor(8 + Math.sin(localFrame * 0.005) * 6) & 0x1F;
+      fixedColor.g = Math.floor(3 + Math.sin(localFrame * 0.003) * 3) & 0x1F;
+      if (localFrame % 10 === 0) glitchDMAMisfire();
+      if (localFrame % 18 === 0) glitchBusConflict();
+    }
+  },
+
+  // ---- SCENE 16: WATERFALL ----
+  {
+    name: "WATERFALL",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateBG2Tiles();
+      generateEnhancedTiles();
+      generateThemedPalette("ocean");
+      generateRasterGradient("ocean");
+      initColorCycling("slow");
+      initParticles(36, "rain");
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+
+      // HDMA wavy scroll
+      const waveValues = [];
+      for (let i = 0; i < SCREEN_H; i++) {
+        waveValues.push(Math.sin(i * 0.05) * 4);
+      }
+      hdmaEffects = [
+        { startScanline: 0, register: "bgScrollX0", values: waveValues }
+      ];
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollY[0] += 4;
+      if (localFrame % 4 === 0) bgScrollY[1] += 2;
+      updateParticles();
+      if (localFrame % 2 === 0) tileMorphColumnCascade();
+      if (localFrame % 25 === 0) glitchHDMA();
+    }
+  },
+
+  // ---- SCENE 17: SHATTER ----
+  {
+    name: "SHATTER",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateBG2Tiles();
+      generateTilemaps();
+      generateThemedPalette("coral");
+      rasterEnabled = false;
+      initColorCycling("slow");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[1] += 1;
+      // Burst every 60 frames
+      if (localFrame % 60 < 1) {
+        glitchTilemapScramble();
+        glitchTilemapScramble();
+        glitchTilemapScramble();
+        glitchTilemapScramble();
+        glitchTilemapScramble();
+        glitchDMAMisfire();
+        glitchDMAMisfire();
+        glitchDMAMisfire();
+      }
+      // Gentle between bursts
+      if (localFrame % 10 === 0) tileMorphWanderingTiles();
+    }
+  },
+
+  // ---- SCENE 18: MIDNIGHT ----
+  {
+    name: "MIDNIGHT",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("midnight");
+      generateRasterGradient("midnight");
+      initColorCycling("breathe");
+      initParticles(12, "scatter");
+      windowEnabled = true;
+      windowMode = 2; // outside
+      windowMaskAction = 0;
+      window1Left = 0; window1Right = SCREEN_W - 1;
+      ghostEnabled = true;
+      ghostAlpha = 0.45;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      updateParticles();
+      // Slowly closing iris
+      const cx = SCREEN_W >> 1;
+      const w = Math.floor((0.5 + Math.sin(localFrame * 0.001) * 0.45) * cx);
+      window1Left = cx - w;
+      window1Right = cx + w;
+    }
+  },
+
+  // ---- SCENE 19: TAPESTRY ----
+  {
+    name: "TAPESTRY",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("stained");
+      rasterEnabled = false;
+      initColorCycling("chase");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x2000;
+
+      // Build diagonal stripe tilemap
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          const tileIdx = (x + y * 3) & 0xFF;
+          const palette = y & 7;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      // BG2 gets different palette assignment per row
+      const tm2Base = bgTilemapAddr[1];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tm2Base + (y * 32 + x) * 2) & 0xFFFF;
+          const tileIdx = (x * 2 + y * 5) & 0xFF;
+          const palette = (y + 4) & 7;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 8 === 0) tileMorphTilemapEcho();
+      if (localFrame % 12 === 0) tileMorphFeedback();
+    }
+  },
+
+  // ---- SCENE 20: STATIC ----
+  {
+    name: "STATIC",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("neon");
+      generateRasterGradient("crt");
+      initColorCycling("off");
+      initParticles(32, "scatter");
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 3;
+      if (localFrame % 4 === 0) bgScrollY[0] += 2;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 2;
+      if (localFrame % 4 === 0) bgScrollY[1] += 1;
+      updateParticles();
+      glitchVRAMBitRot();
+      glitchVRAMBitRot();
+      glitchTilemapScramble();
+    }
+  },
+
+  // ---- SCENE 21: PULSE ----
+  {
+    name: "PULSE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("fire");
+      generateRasterGradient("fire");
+      initColorCycling("pulse");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 1;
+      fixedColor = { r: 4, g: 2, b: 0 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      // Mosaic breathes 1-6 via sine
+      mosaicSize = 1 + Math.floor((Math.sin(localFrame * 0.02) * 0.5 + 0.5) * 5);
+      // Pulsing fixed color
+      fixedColor.r = Math.floor(6 + Math.sin(localFrame * 0.015) * 5) & 0x1F;
+      fixedColor.g = Math.floor(3 + Math.sin(localFrame * 0.01) * 3) & 0x1F;
+      if (localFrame % 8 === 0) tileMorphCrossPollination();
+      if (localFrame % 12 === 0) tileMorphGenomeSplice();
+    }
+  },
+
+  // ---- SCENE 22: DRIFTER ----
+  {
+    name: "DRIFTER",
+    setup() {
+      ppuMode = 7;
+      bgEnabled[0] = false; bgEnabled[1] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("forest");
+      rasterEnabled = false;
+      initColorCycling("slow");
+      initParticles(16, "rise");
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.2;
+      colorMathMode = 0;
+      m7a = 1; m7b = 0; m7c = 0; m7d = 1;
+      m7x = SCREEN_W >> 1; m7y = SCREEN_H >> 1;
+      m7hofs = 0; m7vofs = 0;
+      hdmaEffects = [];
+    },
+    update(localFrame) {
+      const angle = localFrame * 0.0002;
+      m7a = Math.cos(angle);
+      m7b = Math.sin(angle) * 0.1;
+      m7c = -Math.sin(angle) * 0.1;
+      m7d = Math.cos(angle);
+      if (localFrame % 4 === 0) m7vofs += 1;
+      m7hofs = Math.floor(Math.sin(localFrame * 0.0008) * 20);
+      updateParticles();
+      if (localFrame % 40 === 0) glitchMode7();
+    }
+  },
+
+  // ---- SCENE 23: CORRUPTION GARDEN ----
+  {
+    name: "CORRUPTION GARDEN",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("amber");
+      generateRasterGradient("void");
+      initColorCycling("full");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+
+      // Build "garden" tilemap — scattered clusters with empty space
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          // Clusters: use a hash to decide if this cell is populated
+          const hash = ((x * 7 + y * 13 + x * y * 3 + 12345) >>> 0) % 100;
+          const inCluster = hash < 30;
+          const tileIdx = inCluster ? ((x * 11 + y * 7) & 0xFF) : 0;
+          const palette = inCluster ? ((x + y) >> 1) & 7 : 0;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 6 === 0) tileMorphInfection();
+      if (localFrame % 10 === 0) tileMorphGenomeSplice();
+      if (localFrame % 12 === 0) tileMorphFeedback();
+      if (localFrame % 14 === 0) tileMorphCrossPollination();
+    }
+  },
+
+  // ---- SCENE 24: RAVE ----
+  {
+    name: "RAVE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateBG2Tiles();
+      generateThemedPalette("synthwave");
+      generateRasterGradient("rainbow");
+      initColorCycling("chase");
+      initParticles(48, "scatter");
+      windowEnabled = true;
+      windowMode = 4; // XOR
+      windowMaskAction = 2; // invert
+      window1Left = 64; window1Right = 192;
+      window2Left = 32; window2Right = 224;
+      ghostEnabled = false;
+      colorMathMode = 1;
+      fixedColor = { r: 8, g: 0, b: 12 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 2;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] += 2;
+      updateParticles();
+      // Fast-oscillating window boundaries
+      const cx = SCREEN_W >> 1;
+      window1Left = Math.floor(cx + Math.sin(localFrame * 0.025) * (cx * 0.8));
+      window1Right = Math.floor(cx + Math.cos(localFrame * 0.03) * (cx * 0.8));
+      window2Left = Math.floor(cx + Math.sin(localFrame * 0.02 + 1) * (cx * 0.6));
+      window2Right = Math.floor(cx + Math.cos(localFrame * 0.015 + 2) * (cx * 0.6));
+      // Alternate add/sub every 120 frames
+      colorMathMode = (Math.floor(localFrame / 120) & 1) ? 2 : 1;
+      // All glitch types at low probability
+      if (localFrame % 20 === 0) glitchDMAMisfire();
+      if (localFrame % 25 === 0) glitchVRAMBitRot();
+      if (localFrame % 30 === 0) glitchTilemapScramble();
+      if (localFrame % 35 === 0) glitchBitplaneError();
+      if (localFrame % 40 === 0) glitchPaletteCorrupt();
+      if (localFrame % 45 === 0) glitchBusConflict();
+      if (localFrame % 50 === 0) glitchScrollOverflow();
+      if (localFrame % 55 === 0) glitchHDMA();
     }
   },
 ];

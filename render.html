@@ -95,20 +95,19 @@ button:disabled { opacity: 0.4; cursor: default; }
     <label>Resolution:</label>
     <select id="resolution-select" onchange="applyResolutionPreset()">
       <option value="custom">Custom</option>
-      <option value="2">SNES 2x (512x448)</option>
-      <option value="3">SNES 3x (768x672)</option>
-      <option value="4" selected>SNES 4x (1024x896)</option>
-      <option value="5">SNES 5x (1280x1120)</option>
-      <option value="6">SNES 6x (1536x1344)</option>
-      <option value="7">SNES 7x (1792x1568)</option>
-      <option value="8">SNES 8x (2048x1792)</option>
-      <option value="10">SNES 10x (2560x2240)</option>
-      <option value="12">SNES 12x (3072x2688)</option>
-      <option value="16">SNES 16x (4096x3584)</option>
-      <option value="1080p">1080p</option>
-      <option value="4k">4K</option>
+      <option value="2">2x (512x448)</option>
+      <option value="3">3x (768x672)</option>
+      <option value="4" selected>4x (1024x896)</option>
+      <option value="5">5x (1280x1120)</option>
+      <option value="6">6x (1536x1344)</option>
+      <option value="8">8x (2048x1792)</option>
+      <option value="1080p">1080p (1920x1080) — social</option>
+      <option value="1080sq">1080x1080 — Instagram square</option>
+      <option value="1080v">1080x1920 — IG Reels / TikTok</option>
+      <option value="4k">4K (3840x2160)</option>
     </select>
     <span style="color:#555;font-size:10px;margin-left:5px" id="res-display">1024x896</span>
+    <div style="color:#555;font-size:10px;margin-top:2px">PPU renders at 256x224, output is nearest-neighbor upscaled (fat pixels)</div>
   </div>
   <div>
     <label>Width:</label>
@@ -169,6 +168,8 @@ function applyResolutionPreset() {
   let w, h;
   if (val === "custom") return;
   if (val === "1080p") { w = 1920; h = 1080; }
+  else if (val === "1080sq") { w = 1080; h = 1080; }
+  else if (val === "1080v") { w = 1080; h = 1920; }
   else if (val === "4k") { w = 3840; h = 2160; }
   else {
     const scale = parseInt(val);
@@ -224,10 +225,9 @@ function setProgress(pct) {
 // Preview: just run the normal engine on selected scene
 function startPreview() {
   const sceneVal = document.getElementById("scene-select").value;
-  const w = parseInt(document.getElementById("render-w").value) || 256;
-  const h = parseInt(document.getElementById("render-h").value) || 224;
 
-  resizePPU(w, h);
+  // Preview always at native SNES res (output upscale is for export only)
+  resizePPU(256, 224);
   canvas.style.maxWidth = "800px";
   canvas.style.width = "auto";
   canvas.style.height = "auto";
@@ -269,8 +269,16 @@ async function startRender() {
   const totalFrames = Math.ceil(durationSec * fps);
   const frameDeltaMs = 1000 / fps;
 
-  // Setup PPU at render resolution
-  resizePPU(w, h);
+  // PPU always renders at native SNES resolution (256x224).
+  // Output is nearest-neighbor upscaled to the target size.
+  resizePPU(256, 224);
+
+  // Create upscale canvas at target resolution
+  const upCanvas = document.createElement("canvas");
+  upCanvas.width = w;
+  upCanvas.height = h;
+  const upCtx = upCanvas.getContext("2d");
+  upCtx.imageSmoothingEnabled = false; // nearest-neighbor = fat pixels
 
   // Initialize
   resetPPU();
@@ -288,13 +296,14 @@ async function startRender() {
   sceneBrightness = 1.0;
   sceneAutoAdvance = false;
 
-  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at ${w}x${h} ${fps}fps...`);
+  const scale = Math.min(Math.floor(w / 256), Math.floor(h / 224));
+  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at 256x224 → ${w}x${h} (${scale}x upscale) ${fps}fps...`);
   setProgress(0);
 
   if (format === "mp4" || format === "webm") {
-    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format);
+    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upCtx);
   } else {
-    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h);
+    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upCtx);
   }
 
   document.getElementById("btn-render").disabled = false;
@@ -324,8 +333,8 @@ function renderOneFrame(frameDeltaMs) {
 }
 
 // --- Video output via MediaRecorder (MP4 H.264 or WebM VP9) ---
-async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format) {
-  const stream = canvas.captureStream(0); // 0 = manual frame capture
+async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upCtx) {
+  const stream = upCanvas.captureStream(0); // capture from upscaled canvas
   const track = stream.getVideoTracks()[0];
 
   // Pick the best available codec for the requested format
@@ -410,6 +419,9 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 
     renderOneFrame(frameDeltaMs);
 
+    // Nearest-neighbor upscale SNES frame → output resolution
+    upCtx.drawImage(canvas, 0, 0, w, h);
+
     if (track.requestFrame) {
       track.requestFrame();
     }
@@ -444,10 +456,8 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 }
 
 // --- PNG frame sequence output ---
-async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
+async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upCtx) {
   // We'll collect frames and zip them
-  // For simplicity, use individual downloads if no zip library,
-  // or accumulate blobs in memory
   setStatus("Rendering frames to memory...");
 
   const frameBlobs = [];
@@ -458,8 +468,11 @@ async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h) {
 
     renderOneFrame(frameDeltaMs);
 
-    // Capture frame as PNG blob
-    const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+    // Nearest-neighbor upscale SNES frame → output resolution
+    upCtx.drawImage(canvas, 0, 0, w, h);
+
+    // Capture upscaled frame as PNG blob
+    const blob = await new Promise(r => upCanvas.toBlob(r, "image/png"));
     frameBlobs.push({ name: `frame_${String(frame).padStart(6, "0")}.png`, blob });
 
     if (frame % batchSize === 0) {

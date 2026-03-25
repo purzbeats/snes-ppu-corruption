@@ -118,9 +118,9 @@ button:disabled { opacity: 0.4; cursor: default; }
   <div>
     <label>Format:</label>
     <select id="format-select">
-      <option value="mp4">MP4 video (H.264)</option>
+      <option value="mp4">MP4 video (H.264) — includes silent audio for social</option>
       <option value="webm">WebM video (VP9)</option>
-      <option value="frames">PNG frames (zip) — lossless, ffmpeg later</option>
+      <option value="frames">PNG frames (zip) — best quality, use encode.bat for social</option>
     </select>
   </div>
   <div>
@@ -506,6 +506,7 @@ async function startSequenceRender() {
     // Video export (MP4/WebM) via MediaRecorder
     const stream = upCanvas.captureStream(0);
     const track = stream.getVideoTracks()[0];
+    const silentAudio = addSilentAudio(stream); // Instagram requires audio
 
     const rawBitsPerSec = w * h * fps * 24;
     const quality = document.getElementById("quality-select").value;
@@ -569,6 +570,12 @@ async function startSequenceRender() {
     recorder.stop();
     await done;
 
+    // Clean up silent audio
+    if (silentAudio) {
+      silentAudio.oscillator.stop();
+      silentAudio.audioCtx.close();
+    }
+
     if (!cancelled && chunks.length) {
       const blob = new Blob(chunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
@@ -577,7 +584,7 @@ async function startSequenceRender() {
       a.download = `snes_sequence_${w}x${h}_${fps}fps.${format === "mp4" ? "mp4" : "webm"}`;
       a.click();
       URL.revokeObjectURL(url);
-      setStatus(`Done! ${actualTotalFrames} frames, ${(blob.size/1048576).toFixed(1)}MB`);
+      setStatus(`Done! ${actualTotalFrames} frames, ${(blob.size/1048576).toFixed(1)}MB — includes silent audio for social media compat`);
     }
     setProgress(100);
   }
@@ -725,6 +732,26 @@ function cancelRender() {
 // This is exactly what the live engine does per requestAnimationFrame.
 const SIM_DELTA_MS = 1000 / 60;
 
+// Add a silent audio track to a MediaStream (Instagram requires audio)
+function addSilentAudio(stream) {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0; // silent
+    oscillator.connect(gain);
+    const dest = audioCtx.createMediaStreamDestination();
+    gain.connect(dest);
+    oscillator.start();
+    const audioTrack = dest.stream.getAudioTracks()[0];
+    stream.addTrack(audioTrack);
+    return { audioCtx, oscillator }; // caller must stop these when done
+  } catch (e) {
+    console.warn("Could not add silent audio track:", e);
+    return null;
+  }
+}
+
 function simulateTick() {
   if (hdmaEffects.length > 12) {
     hdmaEffects = hdmaEffects.slice(-4);
@@ -746,6 +773,7 @@ function renderOneFrame() {
 async function renderToVideo(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, format, upCanvas, upscaleFrame) {
   const stream = upCanvas.captureStream(0); // capture from upscaled canvas
   const track = stream.getVideoTracks()[0];
+  const silentAudio = addSilentAudio(stream); // Instagram requires audio
 
   // Pick the best available codec for the requested format
   let mimeType, fileExt;
@@ -857,6 +885,12 @@ async function renderToVideo(sceneIdx, totalOutputFrames, simFramesPerOutput, fp
 
   recorder.stop();
   await done;
+
+  // Clean up silent audio
+  if (silentAudio) {
+    silentAudio.oscillator.stop();
+    silentAudio.audioCtx.close();
+  }
 
   if (!cancelled) {
     const blob = new Blob(chunks, { type: mimeType });

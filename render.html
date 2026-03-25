@@ -269,9 +269,18 @@ async function startRender() {
   const totalFrames = Math.ceil(durationSec * fps);
   const frameDeltaMs = 1000 / fps;
 
-  // PPU always renders at native SNES resolution (256x224).
-  // Output is nearest-neighbor upscaled to the target size.
-  resizePPU(256, 224);
+  // Calculate integer pixel scale from the shorter output dimension,
+  // then derive SNES render dimensions to FILL the target aspect ratio.
+  // e.g. 1080x1920 → scale 4 → PPU renders 270x480 → 4x up = 1080x1920
+  const scale = Math.max(1, Math.floor(Math.min(w, h) / 224));
+  const snesW = Math.ceil(w / scale);
+  const snesH = Math.ceil(h / scale);
+  const outW = snesW * scale;
+  const outH = snesH * scale;
+  const offsetX = Math.floor((w - outW) / 2);
+  const offsetY = Math.floor((h - outH) / 2);
+
+  resizePPU(snesW, snesH);
 
   // Create upscale canvas at target resolution
   const upCanvas = document.createElement("canvas");
@@ -296,21 +305,16 @@ async function startRender() {
   sceneBrightness = 1.0;
   sceneAutoAdvance = false;
 
-  // Integer scale to fit output while maintaining square pixels, center with black bars
-  const scale = Math.max(1, Math.min(Math.floor(w / 256), Math.floor(h / 224)));
-  const scaledW = 256 * scale;
-  const scaledH = 224 * scale;
-  const offsetX = Math.floor((w - scaledW) / 2);
-  const offsetY = Math.floor((h - scaledH) / 2);
-
-  // Blit helper: clear to black, nearest-neighbor upscale centered
+  // Blit helper: nearest-neighbor upscale, centered (minimal bars if any)
   function upscaleFrame() {
-    upCtx.fillStyle = "#000";
-    upCtx.fillRect(0, 0, w, h);
-    upCtx.drawImage(canvas, 0, 0, 256, 224, offsetX, offsetY, scaledW, scaledH);
+    if (offsetX > 0 || offsetY > 0) {
+      upCtx.fillStyle = "#000";
+      upCtx.fillRect(0, 0, w, h);
+    }
+    upCtx.drawImage(canvas, 0, 0, snesW, snesH, offsetX, offsetY, outW, outH);
   }
 
-  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at 256x224 → ${scaledW}x${scaledH} (${scale}x) centered in ${w}x${h} ${fps}fps...`);
+  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at ${snesW}x${snesH} → ${outW}x${outH} (${scale}x pixels) ${fps}fps...`);
   setProgress(0);
 
   if (format === "mp4" || format === "webm") {

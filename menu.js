@@ -558,44 +558,190 @@ function pollGamepad() {
 
   const now = performance.now();
 
-  // --- Always-active controls (work whether menu is open or closed) ---
-
-  // Options/Start = toggle menu
+  // --- Always-active: Options = toggle menu ---
   if (gpPressed(gp, GP_OPTIONS)) {
     if (menu.open) menuClose(); else menuOpen();
     userInteracted();
   }
 
-  // L1/R1 = prev/next scene (always)
+  // --- Menu-open: D-pad/stick navigate, Cross=select, Circle=back ---
+  if (menu.open) {
+    const dpadDir = getDpadDirection(gp, now);
+    if (dpadDir) menuNav(dpadDir);
+    if (gpPressed(gp, GP_CROSS)) menuNav("confirm");
+    if (gpPressed(gp, GP_CIRCLE)) menuNav("back");
+
+    // Save states and return — no live controls while menu is up
+    for (let i = 0; i < gp.buttons.length && i < prevButtons.length; i++) {
+      prevButtons[i] = gp.buttons[i].pressed;
+    }
+    return;
+  }
+
+  // ==========================================================
+  //  LIVE CONTROLLER — menu is closed, every input does something
+  // ==========================================================
+
+  // Any input disables attract mode
+  let anyPressed = false;
+  for (let i = 0; i < gp.buttons.length; i++) {
+    if (gp.buttons[i] && gp.buttons[i].pressed) { anyPressed = true; break; }
+  }
+  if (anyPressed || (gp.axes.length >= 2 && (Math.abs(gp.axes[0]) > 0.2 || Math.abs(gp.axes[1]) > 0.2))) {
+    userInteracted();
+  }
+
+  // --- D-PAD: Scene & glitch browsing ---
+  if (gpPressed(gp, GP_UP)) {
+    // D-pad Up: next scene
+    transitionToScene((currentScene + 1) % scenes.length);
+  }
+  if (gpPressed(gp, GP_DOWN)) {
+    // D-pad Down: previous scene
+    transitionToScene((currentScene - 1 + scenes.length) % scenes.length);
+  }
+  if (gpPressed(gp, GP_RIGHT)) {
+    // D-pad Right: next glitch mode
+    glitchMode = (glitchMode + 1) % (GLITCH_FNS.length + 1);
+  }
+  if (gpPressed(gp, GP_LEFT)) {
+    // D-pad Left: previous glitch mode
+    glitchMode = (glitchMode - 1 + GLITCH_FNS.length + 1) % (GLITCH_FNS.length + 1);
+  }
+
+  // --- BUMPERS: Scene skip (always) ---
   if (gpPressed(gp, GP_L1)) {
     transitionToScene((currentScene - 1 + scenes.length) % scenes.length);
-    userInteracted();
   }
   if (gpPressed(gp, GP_R1)) {
     transitionToScene((currentScene + 1) % scenes.length);
-    userInteracted();
   }
 
-  // Any other button press counts as interaction (disables attract mode)
-  for (let i = 0; i < gp.buttons.length; i++) {
-    if (i === GP_OPTIONS || i === GP_L1 || i === GP_R1) continue;
-    if (gp.buttons[i] && gp.buttons[i].pressed) {
-      userInteracted();
-      break;
+  // --- TRIGGERS (analog!): R2 = glitch intensity, L2 = ghost alpha ---
+  if (gp.buttons[GP_R2]) {
+    const r2 = gp.buttons[GP_R2].value; // 0.0–1.0 analog
+    if (r2 > 0.05) {
+      // R2 pressure directly controls glitch intensity
+      glitchIntensity = r2;
+      // At high pressure, fire extra glitches per frame
+      if (r2 > 0.5) {
+        const count = Math.floor((r2 - 0.5) * 6); // 0-3 extra glitches
+        for (let i = 0; i < count; i++) {
+          GLITCH_FNS[glitchRandInt(GLITCH_FNS.length)]();
+        }
+      }
+    }
+  }
+  if (gp.buttons[GP_L2]) {
+    const l2 = gp.buttons[GP_L2].value;
+    if (l2 > 0.05) {
+      // L2 pressure controls ghost frame intensity
+      ghostEnabled = true;
+      ghostAlpha = l2 * 0.7; // 0.0–0.7 range
     }
   }
 
-  // --- Menu-only controls ---
-  if (menu.open) {
-    // D-pad navigation
-    const dpadDir = getDpadDirection(gp, now);
-    if (dpadDir) menuNav(dpadDir);
+  // --- FACE BUTTONS: Instant glitch actions + combos ---
+  // Each face button triggers a specific glitch family WHILE HELD
+  // Hold multiple for combos!
+  const crossHeld = gp.buttons[GP_CROSS] && gp.buttons[GP_CROSS].pressed;
+  const circleHeld = gp.buttons[GP_CIRCLE] && gp.buttons[GP_CIRCLE].pressed;
+  const squareHeld = gp.buttons[GP_SQUARE] && gp.buttons[GP_SQUARE].pressed;
+  const triangleHeld = gp.buttons[GP_TRIANGLE] && gp.buttons[GP_TRIANGLE].pressed;
 
-    // Cross/A = confirm
-    if (gpPressed(gp, GP_CROSS)) menuNav("confirm");
+  // Cross/A: DMA misfire + tile morph (tile destruction)
+  if (crossHeld) {
+    glitchDMAMisfire();
+    if (typeof glitchTileMorph === "function" && glitchRand() < 0.3) glitchTileMorph();
+  }
 
-    // Circle/B = back
-    if (gpPressed(gp, GP_CIRCLE)) menuNav("back");
+  // Circle/B: Palette + color corruption (color chaos)
+  if (circleHeld) {
+    glitchPaletteCorrupt();
+    if (typeof glitchCGRAMShift === "function" && glitchRand() < 0.4) glitchCGRAMShift();
+    if (typeof glitchColorMathSwap === "function" && glitchRand() < 0.2) glitchColorMathSwap();
+  }
+
+  // Square/X: Tilemap + structure corruption (layout chaos)
+  if (squareHeld) {
+    glitchTilemapScramble();
+    if (typeof glitchTilemapMirror === "function" && glitchRand() < 0.4) glitchTilemapMirror();
+    if (typeof glitchAddressLineFault === "function" && glitchRand() < 0.15) glitchAddressLineFault();
+  }
+
+  // Triangle/Y: Visual effects (HDMA, scanlines, bit errors)
+  if (triangleHeld) {
+    glitchHDMA();
+    if (typeof glitchBitplaneError === "function" && glitchRand() < 0.4) glitchBitplaneError();
+    if (typeof glitchScanlineDropout === "function" && glitchRand() < 0.3) glitchScanlineDropout();
+  }
+
+  // COMBO: All four face buttons = MAXIMUM CHAOS
+  if (crossHeld && circleHeld && squareHeld && triangleHeld) {
+    for (let i = 0; i < 5; i++) GLITCH_FNS[glitchRandInt(GLITCH_FNS.length)]();
+    if (typeof glitchVRAMFold === "function") glitchVRAMFold();
+    glitchIntensity = 1.0;
+  }
+
+  // --- LEFT STICK: Scroll control (steer through the corruption) ---
+  if (gp.axes.length >= 2) {
+    const lx = gp.axes[0], ly = gp.axes[1];
+    if (Math.abs(lx) > 0.15 || Math.abs(ly) > 0.15) {
+      bgScrollX[0] += Math.round(lx * 3);
+      bgScrollY[0] += Math.round(ly * 3);
+      // BG1 scrolls opposite for parallax feel
+      bgScrollX[1] -= Math.round(lx * 1.5);
+      bgScrollY[1] -= Math.round(ly * 1.5);
+    }
+  }
+
+  // --- RIGHT STICK: Mode 7 control ---
+  if (gp.axes.length >= 4) {
+    const rx = gp.axes[2], ry = gp.axes[3];
+    if (Math.abs(rx) > 0.15 || Math.abs(ry) > 0.15) {
+      // Right stick X: rotate Mode 7 (or scroll BG1 if not Mode 7)
+      if (ppuMode === 7) {
+        const angle = rx * 0.03;
+        const ca = Math.cos(angle), sa = Math.sin(angle);
+        const a = m7a, b = m7b, c = m7c, d = m7d;
+        m7a = a * ca - c * sa;
+        m7b = b * ca - d * sa;
+        m7c = a * sa + c * ca;
+        m7d = b * sa + d * ca;
+        // Right stick Y: zoom
+        const zoom = 1.0 + ry * 0.02;
+        m7a *= zoom; m7b *= zoom; m7c *= zoom; m7d *= zoom;
+      } else {
+        // In tiled mode, right stick controls BG1 independently
+        bgScrollX[1] += Math.round(rx * 4);
+        bgScrollY[1] += Math.round(ry * 4);
+      }
+    }
+  }
+
+  // --- STICK CLICKS ---
+  // L3: Reset current scene
+  if (gpPressed(gp, GP_L3)) {
+    resetPPU();
+    generateEnhancedTiles();
+    if (typeof generateDitherTiles === "function") generateDitherTiles();
+    if (currentScene >= 0 && currentScene < scenes.length) scenes[currentScene].setup();
+    sceneTimer = 0; sceneElapsedMs = 0;
+  }
+
+  // R3: Screenshot
+  if (gpPressed(gp, GP_R3)) {
+    const link = document.createElement("a");
+    link.download = `snes_corruption_${Date.now()}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
+  // --- SHARE/CREATE: Toggle CRT shader ---
+  if (gpPressed(gp, GP_SHARE)) {
+    if (typeof crtEnabled !== "undefined") {
+      crtEnabled = !crtEnabled;
+    }
   }
 
   // Save button states for edge detection

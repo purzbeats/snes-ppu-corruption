@@ -133,9 +133,32 @@ button:disabled { opacity: 0.4; cursor: default; }
     <span style="color:#555;font-size:10px;margin-left:5px">Pixel art needs high bitrate</span>
   </div>
   <div style="margin-top: 10px">
-    <button id="btn-render" onclick="startRender()">RENDER</button>
+    <button id="btn-render" onclick="startRender()">RENDER SINGLE</button>
     <button id="btn-cancel" onclick="cancelRender()" disabled>CANCEL</button>
     <button id="btn-preview" onclick="startPreview()">PREVIEW</button>
+  </div>
+</div>
+
+<!-- Sequence builder -->
+<div id="controls-panel" style="margin-top:5px">
+  <div style="color:#8f8;font-size:13px;margin-bottom:8px">SEQUENCE BUILDER</div>
+  <div style="font-size:10px;color:#666;margin-bottom:8px">Build a multi-scene sequence with transitions. Each scene gets its own duration.</div>
+  <div>
+    <label>Add scene:</label>
+    <select id="seq-scene-select"></select>
+    <input type="number" id="seq-scene-dur" value="30" min="1" max="600" style="width:50px"> sec
+    <button onclick="seqAdd()" style="padding:4px 12px;font-size:11px">ADD</button>
+  </div>
+  <div>
+    <label>Transition:</label>
+    <input type="number" id="seq-transition" value="2" min="0" max="10" step="0.5" style="width:50px"> sec
+    <span style="color:#555;font-size:10px;margin-left:5px">(fade to black between scenes)</span>
+  </div>
+  <div id="seq-list" style="margin:8px 0;font-size:11px;color:#aaa;max-height:200px;overflow-y:auto"></div>
+  <div id="seq-total" style="font-size:10px;color:#666;margin-bottom:8px"></div>
+  <div>
+    <button id="btn-seq-render" onclick="startSequenceRender()">RENDER SEQUENCE</button>
+    <button onclick="seqClear()" style="padding:4px 12px;font-size:11px;background:#4a2a2a;border-color:#f44;color:#f88">CLEAR</button>
   </div>
 </div>
 
@@ -201,6 +224,365 @@ function populateScenes() {
     opt.textContent = `${i}: ${scenes[i].name}`;
     sel.appendChild(opt);
   }
+}
+
+// ============================================================
+//  SEQUENCE BUILDER
+// ============================================================
+
+const sequence = []; // [{sceneIdx, duration}]
+
+function populateSeqSceneSelect() {
+  const sel = document.getElementById("seq-scene-select");
+  for (let i = 0; i < scenes.length; i++) {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${i}: ${scenes[i].name}`;
+    sel.appendChild(opt);
+  }
+}
+
+function seqAdd() {
+  const idx = parseInt(document.getElementById("seq-scene-select").value);
+  const dur = parseFloat(document.getElementById("seq-scene-dur").value) || 30;
+  sequence.push({ sceneIdx: idx, duration: dur });
+  seqUpdateUI();
+}
+
+function seqRemove(i) {
+  sequence.splice(i, 1);
+  seqUpdateUI();
+}
+
+function seqMoveUp(i) {
+  if (i > 0) { [sequence[i-1], sequence[i]] = [sequence[i], sequence[i-1]]; seqUpdateUI(); }
+}
+
+function seqClear() {
+  sequence.length = 0;
+  seqUpdateUI();
+}
+
+function seqUpdateUI() {
+  const list = document.getElementById("seq-list");
+  const transTime = parseFloat(document.getElementById("seq-transition").value) || 2;
+  if (sequence.length === 0) {
+    list.innerHTML = '<span style="color:#555">No scenes added. Add scenes above.</span>';
+    document.getElementById("seq-total").textContent = "";
+    return;
+  }
+  let html = "";
+  let totalSec = 0;
+  for (let i = 0; i < sequence.length; i++) {
+    const s = sequence[i];
+    const name = scenes[s.sceneIdx] ? scenes[s.sceneIdx].name : "???";
+    html += `<div style="padding:2px 0;border-bottom:1px solid #222">`;
+    html += `<span style="color:#8f8">${i+1}.</span> ${name} — ${s.duration}s `;
+    html += `<span style="cursor:pointer;color:#88f" onclick="seqMoveUp(${i})">&uarr;</span> `;
+    html += `<span style="cursor:pointer;color:#f88" onclick="seqRemove(${i})">&times;</span>`;
+    if (i < sequence.length - 1) html += ` <span style="color:#555;font-size:9px">→ ${transTime}s fade</span>`;
+    html += `</div>`;
+    totalSec += s.duration;
+    if (i < sequence.length - 1) totalSec += transTime * 2; // fade out + fade in
+  }
+  list.innerHTML = html;
+  const mins = Math.floor(totalSec / 60);
+  const secs = Math.round(totalSec % 60);
+  document.getElementById("seq-total").textContent =
+    `Total: ${sequence.length} scenes, ${mins}m${secs}s (${totalSec.toFixed(0)}s with transitions)`;
+}
+
+// --- Sequence renderer ---
+async function startSequenceRender() {
+  if (rendering || sequence.length === 0) return;
+  rendering = true;
+  cancelled = false;
+
+  document.getElementById("btn-render").disabled = true;
+  document.getElementById("btn-seq-render").disabled = true;
+  document.getElementById("btn-cancel").disabled = false;
+
+  const fps = parseInt(document.getElementById("fps-select").value) || 60;
+  const w = parseInt(document.getElementById("render-w").value) || 1080;
+  const h = parseInt(document.getElementById("render-h").value) || 1920;
+  const format = document.getElementById("format-select").value;
+  const transTimeSec = parseFloat(document.getElementById("seq-transition").value) || 2;
+
+  // Calculate SNES render dimensions (same as single render)
+  const scale = Math.max(1, Math.floor(Math.min(w, h) / 224));
+  const snesW = Math.ceil(w / scale);
+  const snesH = Math.ceil(h / scale);
+  const outW = snesW * scale;
+  const outH = snesH * scale;
+  const offsetX = Math.floor((w - outW) / 2);
+  const offsetY = Math.floor((h - outH) / 2);
+
+  resizePPU(snesW, snesH);
+
+  const upCanvas = document.createElement("canvas");
+  upCanvas.width = w;
+  upCanvas.height = h;
+  const upCtx = upCanvas.getContext("2d");
+  upCtx.imageSmoothingEnabled = false;
+
+  function upscaleFrame() {
+    if (offsetX > 0 || offsetY > 0) {
+      upCtx.fillStyle = "#000";
+      upCtx.fillRect(0, 0, w, h);
+    }
+    upCtx.drawImage(canvas, 0, 0, snesW, snesH, offsetX, offsetY, outW, outH);
+  }
+
+  // Calculate total frames across the whole sequence
+  let totalSeconds = 0;
+  for (let i = 0; i < sequence.length; i++) {
+    totalSeconds += sequence[i].duration;
+    if (i < sequence.length - 1) totalSeconds += transTimeSec * 2; // fade out + fade in
+  }
+  const totalOutputFrames = Math.ceil(totalSeconds * fps);
+  const simFramesPerOutput = 60 / fps;
+
+  setStatus(`Sequence: ${sequence.length} scenes, ${totalOutputFrames} frames at ${snesW}x${snesH} → ${outW}x${outH} (${scale}x) ${fps}fps`);
+  setProgress(0);
+
+  // Build the timeline: [{sceneIdx, startFrame, endFrame, type:"scene"|"fade-out"|"fade-in"}]
+  const timeline = [];
+  let framePos = 0;
+  const transFrames = Math.ceil(transTimeSec * fps);
+
+  for (let i = 0; i < sequence.length; i++) {
+    const sceneFrames = Math.ceil(sequence[i].duration * fps);
+
+    // Scene running
+    timeline.push({
+      sceneIdx: sequence[i].sceneIdx,
+      startFrame: framePos,
+      endFrame: framePos + sceneFrames,
+      type: "scene"
+    });
+    framePos += sceneFrames;
+
+    // Transition to next scene (if not last)
+    if (i < sequence.length - 1) {
+      // Fade out
+      timeline.push({
+        sceneIdx: sequence[i].sceneIdx,
+        startFrame: framePos,
+        endFrame: framePos + transFrames,
+        type: "fade-out"
+      });
+      framePos += transFrames;
+
+      // Fade in (next scene)
+      timeline.push({
+        sceneIdx: sequence[i + 1].sceneIdx,
+        startFrame: framePos,
+        endFrame: framePos + transFrames,
+        type: "fade-in"
+      });
+      framePos += transFrames;
+    }
+  }
+
+  const actualTotalFrames = framePos;
+
+  // Initialize PPU
+  resetPPU();
+  generateEnhancedTiles();
+  if (typeof generateDitherTiles === "function") generateDitherTiles();
+  rebuildCGRAMCache();
+
+  // Start first scene
+  let activeScene = -1;
+
+  function setupScene(idx) {
+    if (idx === activeScene) return;
+    activeScene = idx;
+    currentScene = idx;
+    scenes[idx].setup();
+    sceneTimer = 0;
+    sceneElapsedMs = 0;
+    sceneTransitionPhase = 0;
+    sceneBrightness = 1.0;
+    sceneAutoAdvance = false;
+  }
+
+  // Find which timeline segment a frame belongs to
+  function getSegment(frame) {
+    for (let i = 0; i < timeline.length; i++) {
+      if (frame >= timeline[i].startFrame && frame < timeline[i].endFrame) return timeline[i];
+    }
+    return timeline[timeline.length - 1]; // last segment
+  }
+
+  // --- Render all frames ---
+  if (format === "frames") {
+    // PNG frame export with synchronous capture
+    const capturedFrames = [];
+    let simAccum = 0;
+
+    for (let outFrame = 0; outFrame < actualTotalFrames; outFrame++) {
+      if (cancelled) break;
+
+      const seg = getSegment(outFrame);
+      setupScene(seg.sceneIdx);
+
+      // Set brightness based on transition phase
+      if (seg.type === "fade-out") {
+        const t = (outFrame - seg.startFrame) / (seg.endFrame - seg.startFrame);
+        sceneBrightness = Math.max(0, 1.0 - t * t);
+      } else if (seg.type === "fade-in") {
+        const t = (outFrame - seg.startFrame) / (seg.endFrame - seg.startFrame);
+        sceneBrightness = 1.0 - (1.0 - t) * (1.0 - t);
+      } else {
+        sceneBrightness = 1.0;
+      }
+
+      // Simulate
+      simAccum += simFramesPerOutput;
+      while (simAccum >= 1) {
+        simulateTick();
+        simAccum -= 1;
+      }
+
+      renderFrame();
+      upscaleFrame();
+
+      const snapshot = upCtx.getImageData(0, 0, w, h);
+      capturedFrames.push(snapshot.data.slice());
+
+      if (outFrame % 30 === 0) {
+        const pct = ((outFrame / actualTotalFrames) * 100).toFixed(1);
+        setProgress(parseFloat(pct) * 0.6);
+        const segName = scenes[seg.sceneIdx].name;
+        setStatus(`Phase 1/3: ${segName} (${seg.type}) — frame ${outFrame}/${actualTotalFrames} (${pct}%)`);
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    if (cancelled) { finishRender(); return; }
+
+    // Encode to PNG
+    setStatus("Phase 2/3: Encoding PNGs...");
+    const encodeCanvas = document.createElement("canvas");
+    encodeCanvas.width = w; encodeCanvas.height = h;
+    const encodeCtx = encodeCanvas.getContext("2d");
+    const frameBlobs = [];
+
+    for (let i = 0; i < capturedFrames.length; i++) {
+      if (cancelled) break;
+      const imgData = new ImageData(new Uint8ClampedArray(capturedFrames[i]), w, h);
+      encodeCtx.putImageData(imgData, 0, 0);
+      const blob = await new Promise(r => encodeCanvas.toBlob(r, "image/png"));
+      frameBlobs.push({ name: `frame_${String(i).padStart(6, "0")}.png`, blob });
+      capturedFrames[i] = null;
+
+      if (i % 10 === 0) {
+        const pct = ((i / capturedFrames.length) * 100).toFixed(1);
+        setProgress(60 + parseFloat(pct) * 0.3);
+        setStatus(`Phase 2/3: Encoding PNG ${i}/${capturedFrames.length} (${pct}%)`);
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    if (cancelled) { finishRender(); return; }
+
+    // Build ZIP
+    setStatus("Phase 3/3: Building ZIP...");
+    setProgress(90);
+    const zipBlob = await buildZip(frameBlobs);
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snes_sequence_${w}x${h}_${fps}fps_${sequence.length}scenes.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const sizeMB = (zipBlob.size / 1048576).toFixed(1);
+    setStatus(`Done! ${capturedFrames.length} frames, ${sizeMB}MB ZIP`);
+    setProgress(100);
+
+  } else {
+    // Video export (MP4/WebM) via MediaRecorder
+    const stream = upCanvas.captureStream(0);
+    const track = stream.getVideoTracks()[0];
+
+    const rawBitsPerSec = w * h * fps * 24;
+    const quality = document.getElementById("quality-select").value;
+    let bitrate;
+    if (quality === "max") bitrate = Math.min(rawBitsPerSec * 0.5, 200000000);
+    else if (quality === "high") bitrate = Math.min(rawBitsPerSec * 0.25, 120000000);
+    else bitrate = Math.min(rawBitsPerSec * 0.1, 60000000);
+    bitrate = Math.max(bitrate, 20000000);
+
+    let mimeType = format === "mp4" ? 'video/mp4;codecs=avc1' : 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = format === "mp4" ? 'video/mp4' : 'video/webm';
+    }
+
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrate });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+    const done = new Promise(resolve => { recorder.onstop = resolve; });
+    recorder.start(1000);
+
+    let simAccum = 0;
+
+    for (let outFrame = 0; outFrame < actualTotalFrames; outFrame++) {
+      if (cancelled) break;
+
+      const seg = getSegment(outFrame);
+      setupScene(seg.sceneIdx);
+
+      if (seg.type === "fade-out") {
+        const t = (outFrame - seg.startFrame) / (seg.endFrame - seg.startFrame);
+        sceneBrightness = Math.max(0, 1.0 - t * t);
+      } else if (seg.type === "fade-in") {
+        const t = (outFrame - seg.startFrame) / (seg.endFrame - seg.startFrame);
+        sceneBrightness = 1.0 - (1.0 - t) * (1.0 - t);
+      } else {
+        sceneBrightness = 1.0;
+      }
+
+      simAccum += simFramesPerOutput;
+      while (simAccum >= 1) {
+        simulateTick();
+        simAccum -= 1;
+      }
+
+      renderFrame();
+      upscaleFrame();
+
+      if (track.requestFrame) track.requestFrame();
+
+      if (outFrame % 4 === 0) {
+        const pct = ((outFrame / actualTotalFrames) * 100).toFixed(1);
+        setProgress(parseFloat(pct));
+        const segName = scenes[seg.sceneIdx].name;
+        const mbEst = (chunks.reduce((a, c) => a + c.size, 0) / 1048576).toFixed(1);
+        setStatus(`${segName} (${seg.type}) — frame ${outFrame}/${actualTotalFrames} (${pct}%) — ~${mbEst}MB`);
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    recorder.stop();
+    await done;
+
+    if (!cancelled && chunks.length) {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `snes_sequence_${w}x${h}_${fps}fps.${format === "mp4" ? "mp4" : "webm"}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus(`Done! ${actualTotalFrames} frames, ${(blob.size/1048576).toFixed(1)}MB`);
+    }
+    setProgress(100);
+  }
+
+  finishRender();
 }
 
 // Parse URL params for headless/automated use
@@ -324,7 +706,12 @@ async function startRender() {
     await renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, upCanvas, upscaleFrame);
   }
 
+  finishRender();
+}
+
+function finishRender() {
   document.getElementById("btn-render").disabled = false;
+  document.getElementById("btn-seq-render").disabled = false;
   document.getElementById("btn-cancel").disabled = true;
   rendering = false;
 }
@@ -687,6 +1074,8 @@ async function buildZip(files) {
 // --- Init ---
 console.log("Engine loaded, scenes available:", scenes.length);
 populateScenes();
+populateSeqSceneSelect();
+seqUpdateUI();
 parseURLParams();
 applyResolutionPreset();
 updateResDisplay();

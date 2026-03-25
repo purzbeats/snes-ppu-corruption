@@ -1466,6 +1466,164 @@ function glitchHBlankOverflow() {
   }
 }
 
+// --- GLITCH: Register desync (swap BG layer configurations) ---
+function glitchRegisterDesync() {
+  const a = glitchRandInt(4);
+  let b = glitchRandInt(4);
+  while (b === a) b = glitchRandInt(4);
+  // Swap tilemap addresses
+  const tmpTm = bgTilemapAddr[a];
+  bgTilemapAddr[a] = bgTilemapAddr[b];
+  bgTilemapAddr[b] = tmpTm;
+  // Swap character (tile data) addresses
+  const tmpCh = bgCharAddr[a];
+  bgCharAddr[a] = bgCharAddr[b];
+  bgCharAddr[b] = tmpCh;
+}
+
+// --- GLITCH: OAM corrupt (scramble sprite data) ---
+function glitchOAMCorrupt() {
+  const count = 8 + glitchRandInt(13); // 8-20 sprites
+  for (let i = 0; i < count; i++) {
+    const sprIdx = glitchRandInt(128);
+    const base = sprIdx * 4; // each OAM sprite = 4 bytes: X, Y, tile, attr
+    const mode = glitchRandInt(4);
+    switch (mode) {
+      case 0:
+        // XOR X position with 0x80 — jump 128 pixels
+        OAM[base] ^= 0x80;
+        break;
+      case 1:
+        // XOR Y position with 0x80
+        OAM[base + 1] ^= 0x80;
+        break;
+      case 2:
+        // Shift tile index by a random amount
+        OAM[base + 2] = (OAM[base + 2] + 8 + glitchRandInt(48)) & 0xFF;
+        break;
+      case 3:
+        // Scramble attribute byte — flip bits, palette, priority
+        OAM[base + 3] ^= (1 << glitchRandInt(8));
+        break;
+    }
+  }
+}
+
+// --- GLITCH: CGRAM shift (rotate entire palette memory) ---
+function glitchCGRAMShift() {
+  const shift = 2 + glitchRandInt(7); // 2-8 bytes
+  const saved = new Uint8Array(shift);
+  for (let i = 0; i < shift; i++) {
+    saved[i] = CGRAM[i];
+  }
+  for (let i = 0; i < CGRAM_SIZE - shift; i++) {
+    CGRAM[i] = CGRAM[i + shift];
+  }
+  for (let i = 0; i < shift; i++) {
+    CGRAM[CGRAM_SIZE - shift + i] = saved[i];
+  }
+}
+
+// --- GLITCH: VRAM fold (copy a chunk onto itself with offset) ---
+function glitchVRAMFold() {
+  const regionSize = 512 + glitchRandInt(1537); // 512-2048 bytes
+  const srcAddr = glitchRandInt(VRAM_SIZE - regionSize);
+  const offset = 64 + glitchRandInt(193); // 64-256 byte offset
+  const dstAddr = srcAddr + offset;
+  // Copy from source to overlapping destination (use temp to avoid read-after-write issues)
+  const temp = new Uint8Array(regionSize);
+  for (let i = 0; i < regionSize; i++) {
+    temp[i] = VRAM[(srcAddr + i) & 0xFFFF];
+  }
+  for (let i = 0; i < regionSize; i++) {
+    VRAM[(dstAddr + i) & 0xFFFF] = temp[i];
+  }
+}
+
+// --- GLITCH: Mosaic glitch (sudden pixelation bursts) ---
+function glitchMosaicGlitch() {
+  if (glitchRand() < 0.2) {
+    // Extreme mosaic — brief moment of heavy pixelation
+    mosaicSize = 12 + glitchRandInt(5); // 12-16
+  } else {
+    mosaicSize = 2 + glitchRandInt(7); // 2-8
+  }
+  // Enable mosaic on 1-2 random BG layers
+  const numLayers = 1 + glitchRandInt(2);
+  for (let i = 0; i < numLayers; i++) {
+    const bg = glitchRandInt(4);
+    mosaicEnabled[bg] = true;
+  }
+}
+
+// --- GLITCH: Color math swap (toggle blending mode and fixed color) ---
+function glitchColorMathSwap() {
+  colorMathMode = glitchRandInt(4); // 0=off, 1=add, 2=sub, 3=avg
+  // Set fixedColor to random SNES-range values (0-31 per channel)
+  fixedColor.r = glitchRandInt(32);
+  fixedColor.g = glitchRandInt(32);
+  fixedColor.b = glitchRandInt(32);
+  // Enable color math on 1-2 random BGs
+  const numBGs = 1 + glitchRandInt(2);
+  for (let i = 0; i < numBGs; i++) {
+    colorMathBG[glitchRandInt(4)] = true;
+  }
+}
+
+// --- GLITCH: Tilemap mirror (horizontally flip a rectangular region) ---
+function glitchTilemapMirror() {
+  const bgIdx = glitchRandInt(2); // BG0 or BG1
+  const tmBase = bgTilemapAddr[bgIdx];
+  const regionW = 4 + glitchRandInt(9); // 4-12 tiles wide
+  const regionH = 2 + glitchRandInt(8); // 2-9 tiles tall
+  const startCol = glitchRandInt(Math.max(1, 32 - regionW));
+  const startRow = glitchRandInt(Math.max(1, 32 - regionH));
+
+  for (let row = startRow; row < startRow + regionH && row < 32; row++) {
+    // Read the row entries for this region
+    const entries = [];
+    for (let col = startCol; col < startCol + regionW && col < 32; col++) {
+      const addr = (tmBase + (row * 32 + col) * 2) & 0xFFFF;
+      entries.push({ lo: VRAM[addr], hi: VRAM[(addr + 1) & 0xFFFF] });
+    }
+    // Write them back in reverse order, toggling H-flip bit (bit 6 of high byte)
+    const entryCount = entries.length;
+    for (let i = 0; i < entryCount; i++) {
+      const col = startCol + i;
+      const addr = (tmBase + (row * 32 + col) * 2) & 0xFFFF;
+      const src = entries[entryCount - 1 - i];
+      VRAM[addr] = src.lo;
+      VRAM[(addr + 1) & 0xFFFF] = src.hi ^ 0x40; // toggle H-flip
+    }
+  }
+}
+
+// --- GLITCH: Bit crush (reduce color bit depth in CGRAM) ---
+function glitchBitCrush() {
+  // Choose a mask that zeroes lower 1-2 bits per channel
+  // SNES color is 15-bit: 0bbbbbgggggrrrrr
+  const masks = [
+    0x7BCE, // drop lowest bit of R, G, B: 11110 11110 11110
+    0x739C, // drop lowest 2 bits of R, G, B: 11100 11100 11100
+    0x7FDE, // drop lowest bit of R and G only
+    0x7E7C  // drop lowest 2 bits of R, lowest bit of G and B
+  ];
+  const mask = masks[glitchRandInt(masks.length)];
+  // Apply to 2-4 random palettes (each palette = 16 colors = 32 bytes)
+  const numPals = 2 + glitchRandInt(3); // 2-4
+  for (let p = 0; p < numPals; p++) {
+    const pal = glitchRandInt(16); // 16 palettes of 16 colors in 512-byte CGRAM
+    const base = pal * 32;
+    for (let i = 0; i < 32; i += 2) {
+      const addr = (base + i) % CGRAM_SIZE;
+      const w = CGRAM[addr] | (CGRAM[addr + 1] << 8);
+      const crushed = w & mask;
+      CGRAM[addr] = crushed & 0xFF;
+      CGRAM[addr + 1] = (crushed >> 8) & 0xFF;
+    }
+  }
+}
+
 // --- Master glitch dispatcher ---
 const GLITCH_NAMES = [
   "DMA Misfire",
@@ -1480,7 +1638,15 @@ const GLITCH_NAMES = [
   "Tile Morph",
   "Scanline Dropout",
   "Address Line Fault",
-  "HBlank Overflow"
+  "HBlank Overflow",
+  "Register Desync",
+  "OAM Corrupt",
+  "CGRAM Shift",
+  "VRAM Fold",
+  "Mosaic Glitch",
+  "Color Math Swap",
+  "Tilemap Mirror",
+  "Bit Crush"
 ];
 
 const GLITCH_FNS = [
@@ -1496,7 +1662,15 @@ const GLITCH_FNS = [
   glitchTileMorph,
   glitchScanlineDropout,
   glitchAddressLineFault,
-  glitchHBlankOverflow
+  glitchHBlankOverflow,
+  glitchRegisterDesync,
+  glitchOAMCorrupt,
+  glitchCGRAMShift,
+  glitchVRAMFold,
+  glitchMosaicGlitch,
+  glitchColorMathSwap,
+  glitchTilemapMirror,
+  glitchBitCrush
 ];
 
 let activeGlitchNames = [];

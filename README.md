@@ -97,8 +97,8 @@ Any input disables auto-advance. After 2 minutes idle, attract mode resumes.
 
 | File | Role |
 |---|---|
-| `ppu.js` | Core PPU simulation, VRAM/CGRAM/OAM, rendering pipeline, 13 glitch algorithms |
-| `engine.js` | 26 scenes, scene director, sprites, windows, ghost frame, raster bars, color cycling |
+| `ppu.js` | Core PPU simulation, VRAM/CGRAM/OAM, rendering pipeline, 21 glitch algorithms |
+| `engine.js` | 38 scenes, scene director, sprites, windows, ghost frame, raster bars, color cycling |
 | `landscape.js` | 10 landscape biomes with weather particles, parallax, day/night cycle |
 | `crt.js` | WebGL2 CRT post-processing shader |
 | `menu.js` | SNES bitmap font menu, gamepad support, attract mode |

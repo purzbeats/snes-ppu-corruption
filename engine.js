@@ -2263,6 +2263,682 @@ const scenes = [
       fixedColor.b = Math.floor(6 + Math.cos(localFrame * 0.003) * 4) & 0x1F;
     }
   },
+
+  // ---- SCENE 26: AURORA ----
+  {
+    name: "AURORA",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("ice");
+      generateRasterGradient("rainbow");
+      initColorCycling("chase");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.6;
+      colorMathMode = 1; // add
+      fixedColor = { r: 2, g: 4, b: 10 };
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+
+      // HDMA wavy bands — slow sine displacement per scanline
+      const waveValues = [];
+      for (let i = 0; i < SCREEN_H; i++) {
+        waveValues.push(Math.sin(i * 0.03) * 8);
+      }
+      hdmaEffects = [
+        { startScanline: 0, register: "bgScrollX0", values: waveValues },
+        { startScanline: 0, register: "bgScrollX1", values: waveValues.map(v => -v) }
+      ];
+    },
+    update(localFrame) {
+      // Slow dreamy horizontal drift
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 6 === 0) bgScrollX[1] -= 1;
+      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.0008) * 6);
+      bgScrollY[1] = Math.floor(Math.cos(localFrame * 0.0006) * 4);
+
+      // Animate the HDMA wave — shift phase over time for undulating aurora bands
+      if (hdmaEffects.length >= 2) {
+        const vals0 = hdmaEffects[0].values;
+        const vals1 = hdmaEffects[1].values;
+        for (let i = 0; i < SCREEN_H; i++) {
+          vals0[i] = Math.sin(i * 0.03 + localFrame * 0.005) * 10;
+          vals1[i] = -Math.sin(i * 0.025 + localFrame * 0.004) * 8;
+        }
+      }
+
+      // Shift raster offset for moving color bands
+      rasterOffset = localFrame;
+
+      // Very minimal glitches — let colors breathe
+      if (localFrame % 60 === 0 && glitchRand() < 0.3) glitchVRAMBitRot();
+      if (localFrame % 80 === 0) tileMorphWanderingTiles();
+    }
+  },
+
+  // ---- SCENE 27: DATASTREAM ----
+  {
+    name: "DATASTREAM",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("crt");
+      generateRasterGradient("crt");
+      initColorCycling("pulse");
+      initParticles(48, "rain");
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 1;
+      fixedColor = { r: 0, g: 6, b: 0 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // BG1 rapid downward scroll — data cascade
+      bgScrollY[0] += 3;
+      // BG2 slower parallax scroll
+      if (localFrame % 2 === 0) bgScrollY[1] += 1;
+
+      updateParticles();
+
+      // Moderate bit rot for digital corruption feel
+      if (localFrame % 8 === 0) glitchVRAMBitRot();
+      if (localFrame % 12 === 0) tileMorphColumnCascade();
+      if (localFrame % 20 === 0) glitchBitplaneError();
+      if (localFrame % 40 === 0) glitchDMAMisfire();
+
+      // Raster shift
+      rasterOffset = localFrame;
+    }
+  },
+
+  // ---- SCENE 28: KALEIDOSCOPE ----
+  {
+    name: "KALEIDOSCOPE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateThemedPalette("stained");
+      rasterEnabled = false;
+      initColorCycling("full");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.35;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+
+      // Build 4-way symmetric tilemap — more aggressive than MANDALA
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          const mx = x < 16 ? x : 31 - x;
+          const my = y < 16 ? y : 31 - y;
+          const tileIdx = ((mx * mx * 3 + my * my * 7 + mx * my * 5) ^ (mx << 4 | my)) & 0xFF;
+          const palette = ((mx ^ my) + ((mx * my) >> 3)) & 7;
+          const hFlip = x >= 16 ? 1 : 0;
+          const vFlip = y >= 16 ? 1 : 0;
+          const entry = tileIdx | (palette << 10) | (hFlip << 14) | (vFlip << 15);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      // BG2 — rotated symmetry pattern
+      const tm2Base = bgTilemapAddr[1];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tm2Base + (y * 32 + x) * 2) & 0xFFFF;
+          const mx = x < 16 ? x : 31 - x;
+          const my = y < 16 ? y : 31 - y;
+          const tileIdx = ((my * 11 + mx * 13) ^ ((mx + my) * 7)) & 0xFF;
+          const palette = ((mx * my) >> 2) & 7;
+          const hFlip = x >= 16 ? 1 : 0;
+          const vFlip = y >= 16 ? 1 : 0;
+          const entry = tileIdx | (palette << 10) | (hFlip << 14) | (vFlip << 15);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Counter-rotating scroll with wider orbit than MANDALA
+      const angle = localFrame * 0.0015;
+      bgScrollX[0] = Math.floor(Math.cos(angle) * 48);
+      bgScrollY[0] = Math.floor(Math.sin(angle) * 48);
+      bgScrollX[1] = Math.floor(Math.cos(-angle * 1.3) * 36);
+      bgScrollY[1] = Math.floor(Math.sin(-angle * 1.3) * 36);
+
+      // Aggressive mirror flipping every 20 frames
+      if (localFrame % 20 === 0) glitchTilemapMirror();
+
+      // Tile morph for pattern evolution
+      if (localFrame % 6 === 0) tileMorphGenomeSplice();
+      if (localFrame % 10 === 0) tileMorphInfection();
+      if (localFrame % 8 === 0) tileMorphCrossPollination();
+
+      // Pulsing mosaic
+      mosaicSize = 1 + Math.floor(Math.abs(Math.sin(localFrame * 0.005)) * 3);
+    }
+  },
+
+  // ---- SCENE 29: SUBMERGED ----
+  {
+    name: "SUBMERGED",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("ocean");
+      generateRasterGradient("ocean");
+      initColorCycling("slow");
+      initParticles(30, "rise");
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.4;
+      colorMathMode = 1; // add
+      fixedColor = { r: 0, g: 2, b: 8 };
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+
+      // HDMA wavy displacement on all scanlines — underwater distortion
+      const waveValues = [];
+      for (let i = 0; i < SCREEN_H; i++) {
+        waveValues.push(Math.sin(i * 0.04) * 6);
+      }
+      hdmaEffects = [
+        { startScanline: 0, register: "bgScrollX0", values: waveValues },
+        { startScanline: 0, register: "bgScrollX1", values: waveValues.map(v => v * 0.6) }
+      ];
+    },
+    update(localFrame) {
+      // Very slow drift — peaceful
+      if (localFrame % 6 === 0) bgScrollX[0] += 1;
+      if (localFrame % 8 === 0) bgScrollY[0] -= 1;
+      if (localFrame % 10 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 12 === 0) bgScrollY[1] -= 1;
+
+      // Animate the HDMA wave for living water distortion
+      if (hdmaEffects.length >= 2) {
+        const vals0 = hdmaEffects[0].values;
+        const vals1 = hdmaEffects[1].values;
+        for (let i = 0; i < SCREEN_H; i++) {
+          vals0[i] = Math.sin(i * 0.04 + localFrame * 0.008) * 6 + Math.sin(i * 0.08 + localFrame * 0.003) * 3;
+          vals1[i] = vals0[i] * 0.6;
+        }
+      }
+
+      // Rising bubble particles
+      updateParticles();
+
+      // Raster shift for moving blue gradient
+      rasterOffset = localFrame;
+
+      // Very low glitch intensity — dreamy
+      if (localFrame % 50 === 0 && glitchRand() < 0.2) glitchVRAMBitRot();
+      if (localFrame % 40 === 0) tileMorphWanderingTiles();
+    }
+  },
+
+  // ---- SCENE 30: INFERNO ----
+  {
+    name: "INFERNO",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("fire");
+      generateRasterGradient("infrared");
+      initColorCycling("full");
+      initParticles(40, "rise");
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.5;
+      colorMathMode = 1; // add
+      fixedColor = { r: 12, g: 6, b: 0 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Fire rises — both BGs scroll upward at different speeds
+      bgScrollY[0] -= 2;
+      if (localFrame % 2 === 0) bgScrollY[1] -= 1;
+      // Lateral flicker
+      bgScrollX[0] = Math.floor(Math.sin(localFrame * 0.05) * 3);
+      bgScrollX[1] = Math.floor(Math.cos(localFrame * 0.04) * 2);
+
+      updateParticles();
+      rasterOffset = localFrame;
+
+      // Aggressive palette corruption — fire is volatile
+      if (localFrame % 4 === 0) glitchPaletteCorrupt();
+      if (localFrame % 6 === 0) glitchDMAMisfire();
+      if (localFrame % 8 === 0) glitchVRAMBitRot();
+      if (localFrame % 10 === 0) tileMorphInfection();
+      if (localFrame % 15 === 0) tileMorphCascade();
+
+      // Pulsing additive color for heat waves
+      fixedColor.r = Math.floor(10 + Math.sin(localFrame * 0.03) * 5) & 0x1F;
+      fixedColor.g = Math.floor(4 + Math.sin(localFrame * 0.02) * 3) & 0x1F;
+    }
+  },
+
+  // ---- SCENE 31: TESSELLATION ----
+  {
+    name: "TESSELLATION",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("amber");
+      rasterEnabled = false;
+      initColorCycling("slow");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      // Use dither tiles for geometric patterns
+      bgCharAddr[0] = 0x5000;
+      bgCharAddr[1] = 0x2000;
+
+      // Build repeating geometric tilemap
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          // Repeating geometric pattern — diamond/hex-like arrangement
+          const patternA = ((x + y) % 4) * 16 + ((x * y) % 16);
+          const patternB = ((x ^ y) * 3 + (x & y) * 5) & 0xFF;
+          const tileIdx = ((x + y) % 2 === 0) ? patternA & 0xFF : patternB;
+          const palette = ((x + y) >> 2) & 7;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Slow diagonal scroll
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 6 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 6 === 0) bgScrollY[1] += 1;
+
+      // Wandering tile morph for gradual pattern evolution
+      if (localFrame % 8 === 0) tileMorphWanderingTiles();
+      if (localFrame % 15 === 0) tileMorphGenomeSplice();
+
+      // Mosaic alternating between 1 and 2
+      mosaicSize = 1 + (Math.floor(localFrame / 30) % 2);
+    }
+  },
+
+  // ---- SCENE 32: GHOST WORLD ----
+  {
+    name: "GHOST WORLD",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("void");
+      generateRasterGradient("void");
+      initColorCycling("breathe");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.7; // near maximum — trails ARE the art
+      colorMathMode = 3; // average
+      fixedColor = { r: 4, g: 2, b: 8 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Very slow scroll — let trails accumulate
+      bgScrollX[0] = Math.floor(Math.sin(localFrame * 0.0005) * 16);
+      bgScrollY[0] = Math.floor(Math.cos(localFrame * 0.0004) * 12);
+      bgScrollX[1] = Math.floor(Math.sin(localFrame * 0.0003 + 1.5) * 10);
+      bgScrollY[1] = Math.floor(Math.cos(localFrame * 0.0002 + 0.7) * 8);
+
+      rasterOffset = localFrame;
+
+      // Very slow, subtle glitches — the ghost persistence does the heavy lifting
+      if (localFrame % 30 === 0) tileMorphWanderingTiles();
+      if (localFrame % 50 === 0 && glitchRand() < 0.3) glitchVRAMBitRot();
+      if (localFrame % 70 === 0 && glitchRand() < 0.2) glitchDMAMisfire();
+
+      // Subtle oscillation of ghost alpha
+      ghostAlpha = 0.65 + Math.sin(localFrame * 0.002) * 0.05;
+    }
+  },
+
+  // ---- SCENE 33: CHROMATIC ----
+  {
+    name: "CHROMATIC",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("neon");
+      rasterEnabled = false;
+      initColorCycling("full");
+      spritesEnabled = false;
+      windowEnabled = true;
+      windowMode = 4; // XOR
+      windowMaskAction = 2; // invert
+      window1Left = 40; window1Right = 216;
+      window2Left = 80; window2Right = 176;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 2;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+      if (localFrame % 4 === 0) bgScrollY[1] -= 1;
+
+      // Rapidly oscillating windows for color inversion zones
+      const cx = SCREEN_W >> 1;
+      window1Left = Math.floor(cx + Math.sin(localFrame * 0.02) * (cx * 0.7));
+      window1Right = Math.floor(cx + Math.cos(localFrame * 0.025) * (cx * 0.7));
+      window2Left = Math.floor(cx + Math.sin(localFrame * 0.018 + 2) * (cx * 0.5));
+      window2Right = Math.floor(cx + Math.cos(localFrame * 0.022 + 1) * (cx * 0.5));
+
+      // Constant palette corruption — vivid color explosions
+      if (localFrame % 3 === 0) glitchPaletteCorrupt();
+      if (localFrame % 5 === 0) glitchCGRAMShift();
+
+      // Switch palette theme every 200 frames for variety
+      const paletteThemes = ["neon", "synthwave", "coral", "stained", "fire", "ice"];
+      if (localFrame % 200 === 0) {
+        const themeIdx = Math.floor(localFrame / 200) % paletteThemes.length;
+        generateThemedPalette(paletteThemes[themeIdx]);
+      }
+
+      if (localFrame % 15 === 0) tileMorphInfection();
+    }
+  },
+
+  // ---- SCENE 34: EARTHQUAKE ----
+  {
+    name: "EARTHQUAKE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateTilemaps();
+      generateThemedPalette("ruins");
+      rasterEnabled = false;
+      initColorCycling("pulse");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = false;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x4000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Violent random scroll shaking on both BGs
+      bgScrollX[0] += Math.floor((glitchRand() - 0.5) * 8);
+      bgScrollY[0] += Math.floor((glitchRand() - 0.5) * 8);
+      bgScrollX[1] += Math.floor((glitchRand() - 0.5) * 6);
+      bgScrollY[1] += Math.floor((glitchRand() - 0.5) * 6);
+
+      // Tilemap scramble every other frame
+      if (localFrame % 2 === 0) glitchTilemapScramble();
+
+      // Mosaic jumping between 1-4
+      mosaicSize = 1 + glitchRandInt(4);
+
+      // Bus conflict glitches for hardware chaos
+      if (localFrame % 4 === 0) glitchBusConflict();
+      if (localFrame % 6 === 0) glitchDMAMisfire();
+      if (localFrame % 10 === 0) glitchScrollOverflow();
+      if (localFrame % 8 === 0) glitchAddressLineFault();
+
+      // Occasional heavy corruption bursts
+      if (localFrame % 30 < 2) {
+        glitchVRAMBitRot();
+        glitchDMAMisfire();
+        glitchBitplaneError();
+      }
+    }
+  },
+
+  // ---- SCENE 35: STARFIELD ----
+  {
+    name: "STARFIELD",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("midnight");
+      generateRasterGradient("midnight");
+      initColorCycling("breathe");
+      initParticles(20, "scatter");
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.35;
+      colorMathMode = 0;
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x4000;
+
+      // Build a mostly-dark tilemap with sparse bright tiles as stars
+      const tmBase = bgTilemapAddr[0];
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const addr = (tmBase + (y * 32 + x) * 2) & 0xFFFF;
+          // Hash to determine if this is a "star" tile — roughly 15% coverage
+          const hash = ((x * 2654435761 + y * 2246822519) >>> 0) % 100;
+          const isStar = hash < 15;
+          const tileIdx = isStar ? (128 + (hash & 0x1F)) & 0xFF : 0;
+          const palette = isStar ? (hash >> 3) & 7 : 0;
+          const entry = tileIdx | (palette << 10);
+          VRAM[addr] = entry & 0xFF;
+          VRAM[addr + 1] = (entry >> 8) & 0xFF;
+        }
+      }
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // Very slow scroll — drifting through space
+      if (localFrame % 6 === 0) bgScrollX[0] += 1;
+      if (localFrame % 10 === 0) bgScrollY[0] += 1;
+      // BG2 even slower for depth parallax
+      if (localFrame % 12 === 0) bgScrollX[1] += 1;
+      if (localFrame % 16 === 0) bgScrollY[1] += 1;
+
+      updateParticles();
+      rasterOffset = localFrame;
+
+      // Very minimal glitching — serene deep space
+      if (localFrame % 60 === 0 && glitchRand() < 0.15) glitchVRAMBitRot();
+      if (localFrame % 80 === 0) tileMorphWanderingTiles();
+    }
+  },
+
+  // ---- SCENE 36: PRISM ----
+  {
+    name: "PRISM",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateThemedPalette("coral");
+      rasterEnabled = false;
+      initColorCycling("split");
+      spritesEnabled = false;
+      windowEnabled = true;
+      windowMode = 4; // XOR
+      windowMaskAction = 2; // invert
+      window1Left = 64; window1Right = 192;
+      window2Left = 96; window2Right = 160;
+      ghostEnabled = false;
+      colorMathMode = 1; // add
+      fixedColor = { r: 4, g: 2, b: 6 };
+      bgCharAddr[0] = 0x2000;
+      bgCharAddr[1] = 0x0000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+
+      // HDMA creating per-scanline window position shifts for prismatic splitting
+      const w1Vals = [];
+      const w2Vals = [];
+      for (let i = 0; i < SCREEN_H; i++) {
+        w1Vals.push(Math.floor(128 + Math.sin(i * 0.03) * 60));
+        w2Vals.push(Math.floor(128 + Math.cos(i * 0.04) * 40));
+      }
+      hdmaEffects = [
+        { startScanline: 0, register: "window1Left", values: w1Vals },
+        { startScanline: 0, register: "window2Left", values: w2Vals }
+      ];
+    },
+    update(localFrame) {
+      if (localFrame % 4 === 0) bgScrollX[0] += 1;
+      if (localFrame % 4 === 0) bgScrollY[0] += 1;
+      if (localFrame % 4 === 0) bgScrollX[1] -= 1;
+
+      // Animate window positions — oscillating prismatic splits
+      const cx = SCREEN_W >> 1;
+      const phase1 = localFrame * 0.01;
+      const phase2 = localFrame * 0.013;
+      window1Left = Math.floor(cx + Math.sin(phase1) * 80);
+      window1Right = Math.floor(cx + Math.cos(phase1 * 0.7) * 80);
+      window2Left = Math.floor(cx + Math.sin(phase2 + 1.5) * 60);
+      window2Right = Math.floor(cx + Math.cos(phase2 * 0.8 + 1) * 60);
+
+      // Animate HDMA for per-scanline window displacement
+      if (hdmaEffects.length >= 2) {
+        const w1 = hdmaEffects[0].values;
+        const w2 = hdmaEffects[1].values;
+        for (let i = 0; i < SCREEN_H; i++) {
+          w1[i] = Math.floor(cx + Math.sin(i * 0.03 + localFrame * 0.006) * 70);
+          w2[i] = Math.floor(cx + Math.cos(i * 0.04 + localFrame * 0.005) * 50);
+        }
+      }
+
+      // Light glitching
+      if (localFrame % 20 === 0) tileMorphWanderingTiles();
+      if (localFrame % 30 === 0) glitchVRAMBitRot();
+      if (localFrame % 40 === 0) glitchHDMA();
+    }
+  },
+
+  // ---- SCENE 37: CONVERGENCE ----
+  {
+    name: "CONVERGENCE",
+    setup() {
+      ppuMode = 1;
+      bgEnabled[0] = true; bgEnabled[1] = true; bgEnabled[2] = false; bgEnabled[3] = false;
+      generateTileData();
+      generateEnhancedTiles();
+      generateDitherTiles();
+      generateBG2Tiles();
+      generateTilemaps();
+      generateThemedPalette("blood");
+      generateRasterGradient("blood");
+      initColorCycling("pulse");
+      spritesEnabled = false;
+      windowEnabled = false;
+      ghostEnabled = true;
+      ghostAlpha = 0.4;
+      colorMathMode = 2; // subtract — interference via subtraction
+      fixedColor = { r: 4, g: 0, b: 2 };
+      hdmaEffects = [];
+      bgCharAddr[0] = 0x0000;
+      bgCharAddr[1] = 0x2000;
+      bgScrollX[0] = 0; bgScrollY[0] = 0;
+      bgScrollX[1] = 0; bgScrollY[1] = 0;
+    },
+    update(localFrame) {
+      // BG1 scrolls left, BG2 scrolls right — collision course
+      bgScrollX[0] -= 2;
+      bgScrollX[1] += 2;
+      // Gentle vertical drift to prevent perfect alignment
+      bgScrollY[0] = Math.floor(Math.sin(localFrame * 0.002) * 8);
+      bgScrollY[1] = Math.floor(Math.cos(localFrame * 0.0015) * 6);
+
+      rasterOffset = localFrame;
+
+      // BG1 gets DMA misfire corruption
+      if (localFrame % 6 === 0) glitchDMAMisfire();
+      // BG2 gets tilemap scramble corruption
+      if (localFrame % 8 === 0) glitchTilemapScramble();
+
+      // Additional interference at the overlap zone
+      if (localFrame % 12 === 0) glitchVRAMBitRot();
+      if (localFrame % 15 === 0) tileMorphCrossPollination();
+      if (localFrame % 20 === 0) glitchBitplaneError();
+
+      // Ghost alpha pulses with the conflict
+      ghostAlpha = 0.35 + Math.sin(localFrame * 0.008) * 0.1;
+    }
+  },
 ];
 
 // --- Scene transition logic ---

@@ -34,15 +34,16 @@ if %LOSSLESS%==1 (
 )
 
 echo.
-echo [HQ] yuv444p, crf 10 — for direct posting
+echo [HQ] yuv444p, crf 10 — for direct posting where yuv444p is supported
 ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 10 -preset medium -pix_fmt yuv444p -tune animation -movflags +faststart "%DIRNAME%_hq.mp4"
 
 echo.
-echo [SOCIAL] yuv420p, crf 8 — max platform compat
-ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 8 -preset medium -pix_fmt yuv420p -tune animation -movflags +faststart "%DIRNAME%_social.mp4"
+echo [SOCIAL] Instagram/TikTok/Twitter compatible
+echo          yuv420p + silent audio + H.264 Main profile + faststart
+ffmpeg -framerate %FPS% -i frame_%%06d.png -f lavfi -i anullsrc=r=48000:cl=stereo -c:v libx264 -profile:v main -level 4.0 -crf 10 -preset medium -pix_fmt yuv420p -tune animation -c:a aac -b:a 128k -shortest -movflags +faststart "%DIRNAME%_social.mp4"
 
 echo.
 echo Done!
-if %LOSSLESS%==1 echo   %DIRNAME%_lossless.mp4
-echo   %DIRNAME%_hq.mp4
-echo   %DIRNAME%_social.mp4
+if %LOSSLESS%==1 echo   %DIRNAME%_lossless.mp4  — lossless, editing only
+echo   %DIRNAME%_hq.mp4        — near-lossless, yuv444p
+echo   %DIRNAME%_social.mp4    — Instagram/TikTok/Twitter ready

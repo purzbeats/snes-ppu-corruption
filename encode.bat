@@ -30,16 +30,16 @@ for %%I in (.) do set DIRNAME=%%~nxI
 if %LOSSLESS%==1 (
     echo.
     echo [LOSSLESS] yuv444p, crf 0 — perfect source for editing
-    ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 0 -preset veryslow -pix_fmt yuv444p "%DIRNAME%_lossless.mp4"
+    ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 0 -preset medium -pix_fmt yuv444p "%DIRNAME%_lossless.mp4"
 )
 
 echo.
 echo [HQ] yuv444p, crf 10 — for direct posting
-ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 10 -preset veryslow -pix_fmt yuv444p -tune animation -movflags +faststart "%DIRNAME%_hq.mp4"
+ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 10 -preset medium -pix_fmt yuv444p -tune animation -movflags +faststart "%DIRNAME%_hq.mp4"
 
 echo.
 echo [SOCIAL] yuv420p, crf 8 — max platform compat
-ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 8 -preset veryslow -pix_fmt yuv420p -tune animation -movflags +faststart "%DIRNAME%_social.mp4"
+ffmpeg -framerate %FPS% -i frame_%%06d.png -c:v libx264 -crf 8 -preset medium -pix_fmt yuv420p -tune animation -movflags +faststart "%DIRNAME%_social.mp4"
 
 echo.
 echo Done!

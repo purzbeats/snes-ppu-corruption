@@ -266,8 +266,9 @@ async function startRender() {
   const w = parseInt(document.getElementById("render-w").value) || 256;
   const h = parseInt(document.getElementById("render-h").value) || 224;
   const format = document.getElementById("format-select").value;
-  const totalFrames = Math.ceil(durationSec * fps);
-  const frameDeltaMs = 1000 / fps;
+  const totalOutputFrames = Math.ceil(durationSec * fps);
+  const totalSimFrames = Math.ceil(durationSec * 60); // always 60fps internally
+  const simFramesPerOutput = 60 / fps; // e.g. 60/30=2, 60/60=1, 60/24=2.5
 
   // Calculate integer pixel scale from the shorter output dimension,
   // then derive SNES render dimensions to FILL the target aspect ratio.
@@ -314,13 +315,13 @@ async function startRender() {
     upCtx.drawImage(canvas, 0, 0, snesW, snesH, offsetX, offsetY, outW, outH);
   }
 
-  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at ${snesW}x${snesH} → ${outW}x${outH} (${scale}x pixels) ${fps}fps...`);
+  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalOutputFrames} output frames (${totalSimFrames} sim) at ${snesW}x${snesH} → ${outW}x${outH} (${scale}x pixels) ${fps}fps...`);
   setProgress(0);
 
   if (format === "mp4" || format === "webm") {
-    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upscaleFrame);
+    await renderToVideo(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, format, upCanvas, upscaleFrame);
   } else {
-    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upscaleFrame);
+    await renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, upCanvas, upscaleFrame);
   }
 
   document.getElementById("btn-render").disabled = false;
@@ -333,31 +334,29 @@ function cancelRender() {
   setStatus("Cancelling...");
 }
 
-// Render one frame at a fixed timestep (no rAF dependency)
-// Runs multiple simulation ticks per rendered frame so every
-// output frame shows visible change (scenes use localFrame % N
-// gating that would otherwise cause duplicate frames).
-const SIM_TICKS_PER_FRAME = 4;
+// Simulate one tick at the engine's native 60fps rate (16.67ms).
+// This is exactly what the live engine does per requestAnimationFrame.
+const SIM_DELTA_MS = 1000 / 60;
 
-function renderOneFrame(frameDeltaMs) {
-  for (let tick = 0; tick < SIM_TICKS_PER_FRAME; tick++) {
-    // Clear HDMA
-    if (hdmaEffects.length > 12) {
-      hdmaEffects = hdmaEffects.slice(-4);
-    } else if (glitchRand() < 0.08) {
-      hdmaEffects = hdmaEffects.slice(-4);
-    }
-
-    mosaicSize = 1;
-    updateSceneDirector(frameDeltaMs / SIM_TICKS_PER_FRAME);
-    updateColorCycling();
-    frameCount++;
+function simulateTick() {
+  if (hdmaEffects.length > 12) {
+    hdmaEffects = hdmaEffects.slice(-4);
+  } else if (glitchRand() < 0.08) {
+    hdmaEffects = hdmaEffects.slice(-4);
   }
+  mosaicSize = 1;
+  updateSceneDirector(SIM_DELTA_MS);
+  updateColorCycling();
+  frameCount++;
+}
+
+function renderOneFrame() {
+  simulateTick();
   renderFrame();
 }
 
 // --- Video output via MediaRecorder (MP4 H.264 or WebM VP9) ---
-async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upscaleFrame) {
+async function renderToVideo(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, format, upCanvas, upscaleFrame) {
   const stream = upCanvas.captureStream(0); // capture from upscaled canvas
   const track = stream.getVideoTracks()[0];
 
@@ -438,23 +437,33 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 
   const batchSize = 4;
 
-  for (let frame = 0; frame < totalFrames; frame++) {
+  let simFrame = 0;
+  let simAccum = 0;
+
+  for (let outFrame = 0; outFrame < totalOutputFrames; outFrame++) {
     if (cancelled) break;
 
-    renderOneFrame(frameDeltaMs);
+    // Advance simulation at 60fps, capture at output fps
+    simAccum += simFramesPerOutput;
+    while (simAccum >= 1) {
+      simulateTick();
+      simAccum -= 1;
+      simFrame++;
+    }
 
-    // Nearest-neighbor upscale, centered with black bars
+    // Render + upscale the current state
+    renderFrame();
     upscaleFrame();
 
     if (track.requestFrame) {
       track.requestFrame();
     }
 
-    if (frame % batchSize === 0) {
-      const pct = ((frame / totalFrames) * 100).toFixed(1);
+    if (outFrame % batchSize === 0) {
+      const pct = ((outFrame / totalOutputFrames) * 100).toFixed(1);
       setProgress(parseFloat(pct));
       const mbEst = ((chunks.reduce((a, c) => a + c.size, 0)) / 1048576).toFixed(1);
-      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${frame}/${totalFrames} (${pct}%) — ~${mbEst}MB @ ${(bitrate/1000000).toFixed(0)}Mbps`);
+      setStatus(`Rendering ${scenes[sceneIdx].name} — frame ${outFrame}/${totalOutputFrames} (${pct}%) sim:${simFrame} — ~${mbEst}MB @ ${(bitrate/1000000).toFixed(0)}Mbps`);
       await new Promise(r => setTimeout(r, 0));
     }
   }
@@ -471,7 +480,7 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
     a.click();
     URL.revokeObjectURL(url);
     const sizeMB = (blob.size / 1048576).toFixed(1);
-    setStatus(`Done! ${totalFrames} frames, ${sizeMB}MB ${fileExt.toUpperCase()}. File downloading.`);
+    setStatus(`Done! ${totalOutputFrames} frames, ${sizeMB}MB ${fileExt.toUpperCase()}. File downloading.`);
     setProgress(100);
   } else {
     setStatus("Cancelled.");
@@ -480,29 +489,38 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 }
 
 // --- PNG frame sequence output ---
-async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upscaleFrame) {
+async function renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, upCanvas, upscaleFrame) {
   // We'll collect frames and zip them
   setStatus("Rendering frames to memory...");
 
   const frameBlobs = [];
   const batchSize = 2;
+  let simFrame = 0;
+  let simAccum = 0;
 
-  for (let frame = 0; frame < totalFrames; frame++) {
+  for (let outFrame = 0; outFrame < totalOutputFrames; outFrame++) {
     if (cancelled) break;
 
-    renderOneFrame(frameDeltaMs);
+    // Advance simulation at 60fps, capture at output fps
+    simAccum += simFramesPerOutput;
+    while (simAccum >= 1) {
+      simulateTick();
+      simAccum -= 1;
+      simFrame++;
+    }
 
-    // Nearest-neighbor upscale, centered with black bars
+    // Render + upscale the current state
+    renderFrame();
     upscaleFrame();
 
     // Capture upscaled frame as PNG blob
     const blob = await new Promise(r => upCanvas.toBlob(r, "image/png"));
-    frameBlobs.push({ name: `frame_${String(frame).padStart(6, "0")}.png`, blob });
+    frameBlobs.push({ name: `frame_${String(outFrame).padStart(6, "0")}.png`, blob });
 
-    if (frame % batchSize === 0) {
-      const pct = ((frame / totalFrames) * 100).toFixed(1);
+    if (outFrame % batchSize === 0) {
+      const pct = ((outFrame / totalOutputFrames) * 100).toFixed(1);
       setProgress(parseFloat(pct));
-      setStatus(`Rendering frames — ${frame}/${totalFrames} (${pct}%) — ${(frameBlobs.length * blob.size / 1048576).toFixed(0)}MB in memory`);
+      setStatus(`Rendering frames — ${outFrame}/${totalOutputFrames} (${pct}%) sim:${simFrame} — ${(frameBlobs.length * blob.size / 1048576).toFixed(0)}MB in memory`);
       await new Promise(r => setTimeout(r, 0));
     }
   }

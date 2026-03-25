@@ -489,19 +489,25 @@ async function renderToVideo(sceneIdx, totalOutputFrames, simFramesPerOutput, fp
 }
 
 // --- PNG frame sequence output ---
+// Two-phase approach for frame-perfect sequencing:
+//   Phase 1: Render + synchronous pixel capture (getImageData) — deterministic order
+//   Phase 2: Encode captured pixels to PNG blobs — can be async safely
 async function renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, fps, w, h, upCanvas, upscaleFrame) {
-  // We'll collect frames and zip them
-  setStatus("Rendering frames to memory...");
+  const upCtx = upCanvas.getContext("2d");
 
-  const frameBlobs = [];
-  const batchSize = 2;
+  // --- Phase 1: Render & capture ---
+  // Synchronous pixel snapshots guarantee frame order.
+  // We capture raw pixel data, not PNG — encoding happens in phase 2.
+  setStatus("Phase 1/3: Rendering frames...");
+  const capturedFrames = []; // array of Uint8ClampedArray (pixel data only, not full ImageData)
   let simFrame = 0;
   let simAccum = 0;
+  const YIELD_INTERVAL = 30; // yield to browser every N frames for progress
 
   for (let outFrame = 0; outFrame < totalOutputFrames; outFrame++) {
     if (cancelled) break;
 
-    // Advance simulation at 60fps, capture at output fps
+    // Advance simulation at native 60fps
     simAccum += simFramesPerOutput;
     while (simAccum >= 1) {
       simulateTick();
@@ -509,18 +515,56 @@ async function renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, f
       simFrame++;
     }
 
-    // Render + upscale the current state
+    // Render PPU → source canvas → upscale canvas
     renderFrame();
     upscaleFrame();
 
-    // Capture upscaled frame as PNG blob
-    const blob = await new Promise(r => upCanvas.toBlob(r, "image/png"));
-    frameBlobs.push({ name: `frame_${String(outFrame).padStart(6, "0")}.png`, blob });
+    // Synchronous pixel capture — this is the critical part.
+    // getImageData forces a pipeline flush and returns the exact
+    // pixels on the canvas RIGHT NOW, not whenever the browser feels like it.
+    const snapshot = upCtx.getImageData(0, 0, w, h);
+    capturedFrames.push(snapshot.data.slice()); // copy the pixel buffer
 
-    if (outFrame % batchSize === 0) {
+    if (outFrame % YIELD_INTERVAL === 0) {
       const pct = ((outFrame / totalOutputFrames) * 100).toFixed(1);
-      setProgress(parseFloat(pct));
-      setStatus(`Rendering frames — ${outFrame}/${totalOutputFrames} (${pct}%) sim:${simFrame} — ${(frameBlobs.length * blob.size / 1048576).toFixed(0)}MB in memory`);
+      setProgress(parseFloat(pct) * 0.6); // phase 1 = 0-60% of progress bar
+      const memMB = ((capturedFrames.length * w * h * 4) / 1048576).toFixed(0);
+      setStatus(`Phase 1/3: Rendering — frame ${outFrame}/${totalOutputFrames} (${pct}%) — ${memMB}MB captured`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  if (cancelled) { setStatus("Cancelled."); setProgress(0); return; }
+
+  // --- Phase 2: Encode to PNG ---
+  // Now that all frames are captured in guaranteed order,
+  // encode them to PNG blobs using a dedicated encoding canvas.
+  setStatus("Phase 2/3: Encoding PNGs...");
+  const encodeCanvas = document.createElement("canvas");
+  encodeCanvas.width = w;
+  encodeCanvas.height = h;
+  const encodeCtx = encodeCanvas.getContext("2d");
+  const frameBlobs = [];
+
+  for (let i = 0; i < capturedFrames.length; i++) {
+    if (cancelled) break;
+
+    // Write captured pixels to encoding canvas
+    const imgData = new ImageData(new Uint8ClampedArray(capturedFrames[i]), w, h);
+    encodeCtx.putImageData(imgData, 0, 0);
+
+    // Encode to PNG blob
+    const blob = await new Promise(r => encodeCanvas.toBlob(r, "image/png"));
+    frameBlobs.push({ name: `frame_${String(i).padStart(6, "0")}.png`, blob });
+
+    // Free the raw pixel data as we encode (save memory)
+    capturedFrames[i] = null;
+
+    if (i % 10 === 0) {
+      const pct = ((i / capturedFrames.length) * 100).toFixed(1);
+      setProgress(60 + parseFloat(pct) * 0.3); // phase 2 = 60-90%
+      const sizeMB = (frameBlobs.reduce((a, f) => a + f.blob.size, 0) / 1048576).toFixed(0);
+      setStatus(`Phase 2/3: Encoding PNG ${i}/${capturedFrames.length} (${pct}%) — ${sizeMB}MB`);
       await new Promise(r => setTimeout(r, 0));
     }
   }
@@ -531,9 +575,9 @@ async function renderToFrames(sceneIdx, totalOutputFrames, simFramesPerOutput, f
     return;
   }
 
-  // Build a simple ZIP file (no library needed — minimal ZIP format)
-  setStatus("Building ZIP...");
-  await new Promise(r => setTimeout(r, 50));
+  // --- Phase 3: Build ZIP ---
+  setStatus("Phase 3/3: Building ZIP...");
+  setProgress(90);
 
   const zipBlob = await buildZip(frameBlobs);
   const url = URL.createObjectURL(zipBlob);

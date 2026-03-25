@@ -296,14 +296,27 @@ async function startRender() {
   sceneBrightness = 1.0;
   sceneAutoAdvance = false;
 
-  const scale = Math.min(Math.floor(w / 256), Math.floor(h / 224));
-  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at 256x224 → ${w}x${h} (${scale}x upscale) ${fps}fps...`);
+  // Integer scale to fit output while maintaining square pixels, center with black bars
+  const scale = Math.max(1, Math.min(Math.floor(w / 256), Math.floor(h / 224)));
+  const scaledW = 256 * scale;
+  const scaledH = 224 * scale;
+  const offsetX = Math.floor((w - scaledW) / 2);
+  const offsetY = Math.floor((h - scaledH) / 2);
+
+  // Blit helper: clear to black, nearest-neighbor upscale centered
+  function upscaleFrame() {
+    upCtx.fillStyle = "#000";
+    upCtx.fillRect(0, 0, w, h);
+    upCtx.drawImage(canvas, 0, 0, 256, 224, offsetX, offsetY, scaledW, scaledH);
+  }
+
+  setStatus(`Rendering ${scenes[sceneIdx].name} — ${totalFrames} frames at 256x224 → ${scaledW}x${scaledH} (${scale}x) centered in ${w}x${h} ${fps}fps...`);
   setProgress(0);
 
   if (format === "mp4" || format === "webm") {
-    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upCtx);
+    await renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upscaleFrame);
   } else {
-    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upCtx);
+    await renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upscaleFrame);
   }
 
   document.getElementById("btn-render").disabled = false;
@@ -333,7 +346,7 @@ function renderOneFrame(frameDeltaMs) {
 }
 
 // --- Video output via MediaRecorder (MP4 H.264 or WebM VP9) ---
-async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upCtx) {
+async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, format, upCanvas, upscaleFrame) {
   const stream = upCanvas.captureStream(0); // capture from upscaled canvas
   const track = stream.getVideoTracks()[0];
 
@@ -419,8 +432,8 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 
     renderOneFrame(frameDeltaMs);
 
-    // Nearest-neighbor upscale SNES frame → output resolution
-    upCtx.drawImage(canvas, 0, 0, w, h);
+    // Nearest-neighbor upscale, centered with black bars
+    upscaleFrame();
 
     if (track.requestFrame) {
       track.requestFrame();
@@ -456,7 +469,7 @@ async function renderToVideo(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, for
 }
 
 // --- PNG frame sequence output ---
-async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upCtx) {
+async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, upCanvas, upscaleFrame) {
   // We'll collect frames and zip them
   setStatus("Rendering frames to memory...");
 
@@ -468,8 +481,8 @@ async function renderToFrames(sceneIdx, totalFrames, frameDeltaMs, fps, w, h, up
 
     renderOneFrame(frameDeltaMs);
 
-    // Nearest-neighbor upscale SNES frame → output resolution
-    upCtx.drawImage(canvas, 0, 0, w, h);
+    // Nearest-neighbor upscale, centered with black bars
+    upscaleFrame();
 
     // Capture upscaled frame as PNG blob
     const blob = await new Promise(r => upCanvas.toBlob(r, "image/png"));

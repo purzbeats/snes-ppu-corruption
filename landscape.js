@@ -7,6 +7,8 @@
 
 if (typeof LANDSCAPE_LOADED === "undefined") { var LANDSCAPE_LOADED = true; }
 
+// sinLUT / cosLUT defined in ppu.js (loaded first)
+
 // ============================================================
 //  SECTION 1: TILE WRITING HELPERS
 // ============================================================
@@ -44,6 +46,7 @@ function writeCGRAM(palIdx, colIdx, r, g, b) {
   const addr = (palIdx * 16 + colIdx) * 2;
   CGRAM[addr] = snes & 0xFF;
   CGRAM[addr + 1] = (snes >> 8) & 0xFF;
+  markCGRAMDirty();
 }
 
 function writeTilemapEntry(base, tx, ty, tileIdx, palette, hFlip, vFlip) {
@@ -2202,7 +2205,7 @@ function createLandscapeScene(biome, displayName, composeFn) {
         const col = 1 + glitchRandInt(15);
         const addr = (pal * 16 + col) * 2;
         CGRAM[addr] ^= glitchRandInt(16);
-        rebuildCGRAMCache();
+        markCGRAMDirty();
       }
       // Occasional DMA misfire for dramatic tile morphing
       if (localFrame % 45 === 0) {
@@ -2215,64 +2218,49 @@ function createLandscapeScene(biome, displayName, composeFn) {
       }
 
       // --- Biome-specific subtle animation ---
+      // PERF: use sinLUT + pre-allocated buffers instead of Array.from + Math.sin
       switch (biome) {
         case "volcanic":
           // Heat shimmer HDMA near volcano
           if (localFrame % 30 === 0 && hdmaEffects.length < 4) {
-            hdmaEffects.push({
-              startScanline: 20,
-              register: "scrollX",
-              bg: 1,
-              values: Array.from({ length: 40 }, (_, i) =>
-                Math.floor(Math.sin((localFrame + i) * 0.08) * 2))
-            });
+            const vals = new Array(40);
+            for (let i = 0; i < 40; i++) vals[i] = (sinLUT((localFrame + i) * 0.08) * 2) | 0;
+            hdmaEffects.push({ startScanline: 20, register: "scrollX", bg: 1, values: vals });
           }
           break;
 
         case "ocean":
           // Gentle wave HDMA on water surface
           if (localFrame % 25 === 0 && hdmaEffects.length < 4) {
-            const waterStart = Math.floor(SCREEN_H * 0.5);
-            hdmaEffects.push({
-              startScanline: waterStart,
-              register: "scrollX",
-              bg: 0,
-              values: Array.from({ length: 20 }, (_, i) =>
-                Math.floor(Math.sin((localFrame * 0.015 + i * 0.3)) * 2))
-            });
+            const waterStart = (SCREEN_H * 0.5) | 0;
+            const vals = new Array(20);
+            for (let i = 0; i < 20; i++) vals[i] = (sinLUT(localFrame * 0.015 + i * 0.3) * 2) | 0;
+            hdmaEffects.push({ startScanline: waterStart, register: "scrollX", bg: 0, values: vals });
           }
           break;
 
         case "desert":
           // Heat shimmer HDMA across horizon
           if (localFrame % 25 === 0 && hdmaEffects.length < 4) {
-            hdmaEffects.push({
-              startScanline: 30,
-              register: "scrollX",
-              bg: 1,
-              values: Array.from({ length: 50 }, (_, i) =>
-                Math.floor(Math.sin((localFrame + i) * 0.06) * 3))
-            });
+            const vals = new Array(50);
+            for (let i = 0; i < 50; i++) vals[i] = (sinLUT((localFrame + i) * 0.06) * 3) | 0;
+            hdmaEffects.push({ startScanline: 30, register: "scrollX", bg: 1, values: vals });
           }
           break;
 
         case "neon":
           // Flickering neon via occasional palette jitter on sky
           if (localFrame % 20 === 0 && hdmaEffects.length < 4) {
-            hdmaEffects.push({
-              startScanline: Math.floor(SCREEN_H * 0.3),
-              register: "scrollX",
-              bg: 1,
-              values: Array.from({ length: 30 }, (_, i) =>
-                Math.floor(Math.sin((localFrame * 0.03 + i * 0.5)) * 1))
-            });
+            const vals = new Array(30);
+            for (let i = 0; i < 30; i++) vals[i] = (sinLUT(localFrame * 0.03 + i * 0.5) * 1) | 0;
+            hdmaEffects.push({ startScanline: (SCREEN_H * 0.3) | 0, register: "scrollX", bg: 1, values: vals });
           }
           break;
       }
 
       // HDMA cleanup
       if (hdmaEffects.length > 6) {
-        hdmaEffects = hdmaEffects.slice(-2);
+        hdmaEffects.length = 2; // truncate in-place instead of slice
       }
     }
   };

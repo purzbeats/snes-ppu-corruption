@@ -91,6 +91,19 @@ let frameCount = 0;
 let lastGlitchBurst = 0;
 let autoGlitch = true;
 
+// --- Sine lookup table (shared across all files) ---
+const SINE_LUT_SIZE = 1024;
+const SINE_LUT = new Float32Array(SINE_LUT_SIZE);
+for (let _sli = 0; _sli < SINE_LUT_SIZE; _sli++) {
+  SINE_LUT[_sli] = Math.sin(_sli * (2 * Math.PI / SINE_LUT_SIZE));
+}
+function sinLUT(x) {
+  return SINE_LUT[((x * (SINE_LUT_SIZE / (2 * Math.PI))) % SINE_LUT_SIZE + SINE_LUT_SIZE) & (SINE_LUT_SIZE - 1)];
+}
+function cosLUT(x) {
+  return SINE_LUT[((x * (SINE_LUT_SIZE / (2 * Math.PI)) + (SINE_LUT_SIZE >> 2)) % SINE_LUT_SIZE + SINE_LUT_SIZE) & (SINE_LUT_SIZE - 1)];
+}
+
 // --- 15-bit SNES color conversion ---
 // PERF: snesColorToRGB now returns packed RGBA uint32 (no object allocation)
 function snesColorToRGB(lo, hi) {
@@ -113,10 +126,15 @@ function packRGBA(r, g, b, a = 255) {
 }
 
 // --- CGRAM cache: pre-computed packed RGBA for each palette entry ---
-// Rebuilt once per frame — avoids per-pixel snesColorToRGB calls
+// Rebuilt only when CGRAM is modified (dirty flag avoids 256 unpacks/frame)
 const cgramCache = new Uint32Array(256);
+let cgramDirty = true;
+
+function markCGRAMDirty() { cgramDirty = true; }
 
 function rebuildCGRAMCache() {
+  if (!cgramDirty) return;
+  cgramDirty = false;
   for (let i = 0; i < 256; i++) {
     const lo = CGRAM[i * 2];
     const hi = CGRAM[i * 2 + 1];
@@ -321,6 +339,7 @@ function generatePalette() {
       CGRAM[idx * 2 + 1] = (snesCol >> 8) & 0xFF;
     }
   }
+  markCGRAMDirty();
 }
 
 function hslToRGB(h, s, l) {
@@ -375,6 +394,7 @@ function getCGRAMColor(paletteIdx, colorIdx) {
 }
 
 // --- Render a BG layer scanline ---
+// PERF: iterates per-tile (8px blocks), inlines tile decode + CGRAM lookup
 function renderBGScanline(bgIdx, scanline, lineBuffer, priorityBuffer) {
   if (!bgEnabled[bgIdx]) return;
 
@@ -382,36 +402,57 @@ function renderBGScanline(bgIdx, scanline, lineBuffer, priorityBuffer) {
   const chBase = bgCharAddr[bgIdx];
   const scrollX = bgScrollX[bgIdx];
   const scrollY = bgScrollY[bgIdx];
+  const mapY = (scanline + scrollY) & 0xFF;
+  const tileY = mapY >> 3;
+  const pixY = mapY & 7;
+  const bgPri2 = bgIdx * 2;
 
-  for (let screenX = 0; screenX < SCREEN_W; screenX++) {
+  let screenX = 0;
+  while (screenX < SCREEN_W) {
     const mapX = (screenX + scrollX) & 0xFF;
-    const mapY = (scanline + scrollY) & 0xFF;
     const tileX = mapX >> 3;
-    const tileY = mapY >> 3;
-    const pixX = mapX & 7;
-    const pixY = mapY & 7;
+    const startPixX = mapX & 7;
+    // How many pixels remain in this tile (and on screen)
+    const tilePixRemain = 8 - startPixX;
+    const screenRemain = SCREEN_W - screenX;
+    const count = tilePixRemain < screenRemain ? tilePixRemain : screenRemain;
 
+    // Fetch tilemap entry once per tile
     const tmAddr = (tmBase + (tileY * 32 + tileX) * 2) & 0xFFFF;
-    const lo = VRAM[tmAddr];
-    const hi = VRAM[(tmAddr + 1) & 0xFFFF];
-    const entry = lo | (hi << 8);
-
+    const entry = VRAM[tmAddr] | (VRAM[(tmAddr + 1) & 0xFFFF] << 8);
     const tileIdx = entry & 0x3FF;
     const palette = (entry >> 10) & 7;
-    const priority = (entry >> 13) & 1;
+    const layerPriority = bgPri2 + ((entry >> 13) & 1);
     const hFlip = (entry >> 14) & 1;
     const vFlip = (entry >> 15) & 1;
 
-    const colorIdx = decodeTilePixel(chBase, tileIdx, pixX, pixY, hFlip, vFlip);
+    // Pre-compute tile VRAM address and row offset once per tile
+    const tileAddr = (chBase + tileIdx * 32) & 0xFFFF;
+    const ty = vFlip ? (7 - pixY) : pixY;
+    const rowAddr = tileAddr + ty * 2;
+    const bp01lo = VRAM[(rowAddr) & 0xFFFF];
+    const bp01hi = VRAM[(rowAddr + 1) & 0xFFFF];
+    const bp23lo = VRAM[(rowAddr + 16) & 0xFFFF];
+    const bp23hi = VRAM[(rowAddr + 17) & 0xFFFF];
+    const palBase = (palette * 16) & 0xFF;
 
-    if (colorIdx !== 0) { // color 0 = transparent
-      const layerPriority = bgIdx * 2 + priority;
-      if (layerPriority >= priorityBuffer[screenX]) {
-        const color = getCGRAMColor(palette, colorIdx);
-        lineBuffer[screenX] = color;
-        priorityBuffer[screenX] = layerPriority;
+    for (let p = 0; p < count; p++) {
+      const px = startPixX + p;
+      const tx = hFlip ? (7 - px) : px;
+      const shift = 7 - tx;
+      const colorIdx = ((bp01lo >> shift) & 1) |
+                        (((bp01hi >> shift) & 1) << 1) |
+                        (((bp23lo >> shift) & 1) << 2) |
+                        (((bp23hi >> shift) & 1) << 3);
+      if (colorIdx !== 0) {
+        const sx = screenX + p;
+        if (layerPriority >= priorityBuffer[sx]) {
+          lineBuffer[sx] = cgramCache[(palBase + colorIdx) & 0xFF];
+          priorityBuffer[sx] = layerPriority;
+        }
       }
     }
+    screenX += count;
   }
 }
 
@@ -450,7 +491,7 @@ function renderMode7Scanline(scanline, lineBuffer, priorityBuffer) {
     const colorIdx = decodeTilePixel(0, tileIdx, px, py, false, false);
 
     if (colorIdx !== 0) {
-      lineBuffer[screenX] = getCGRAMColor(0, colorIdx);
+      lineBuffer[screenX] = cgramCache[colorIdx & 0xFF];
       priorityBuffer[screenX] = 10; // mode 7 = high priority
     }
   }
@@ -531,13 +572,17 @@ function renderFrame() {
       }
     }
 
-    applyMosaic(lineBuffer);
+    if (mosaicSize > 1) applyMosaic(lineBuffer);
 
     const fbOffset = scanline * SCREEN_W;
-    for (let x = 0; x < SCREEN_W; x++) {
-      let px = lineBuffer[x];
-      if (colorMathMode !== 0) px = applyColorMath(px);
-      fb[fbOffset + x] = px;
+    if (colorMathMode !== 0) {
+      for (let x = 0; x < SCREEN_W; x++) {
+        fb[fbOffset + x] = applyColorMath(lineBuffer[x]);
+      }
+    } else {
+      for (let x = 0; x < SCREEN_W; x++) {
+        fb[fbOffset + x] = lineBuffer[x];
+      }
     }
   }
 
@@ -650,6 +695,7 @@ function glitchPaletteCorrupt() {
       break;
     }
   }
+  markCGRAMDirty();
 }
 
 // --- GLITCH: Tilemap scramble (corrupt tilemap entries) ---
@@ -1349,6 +1395,7 @@ function glitchTileMorph() {
     const nw = (w & mask) | (component << shift);
     CGRAM[addr] = nw & 0xFF;
     CGRAM[addr + 1] = (nw >> 8) & 0xFF;
+    markCGRAMDirty();
   }
 }
 
@@ -1522,6 +1569,7 @@ function glitchCGRAMShift() {
   for (let i = 0; i < shift; i++) {
     CGRAM[CGRAM_SIZE - shift + i] = saved[i];
   }
+  markCGRAMDirty();
 }
 
 // --- GLITCH: VRAM fold (copy a chunk onto itself with offset) ---
@@ -1622,6 +1670,7 @@ function glitchBitCrush() {
       CGRAM[addr + 1] = (crushed >> 8) & 0xFF;
     }
   }
+  markCGRAMDirty();
 }
 
 // --- Master glitch dispatcher ---

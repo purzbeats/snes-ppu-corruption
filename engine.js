@@ -442,6 +442,7 @@ function generateThemedPalette(theme) {
       CGRAM[idx * 2 + 1] = (sc >> 8) & 0xFF;
     }
   }
+  markCGRAMDirty();
 }
 
 // ============================================================
@@ -672,6 +673,7 @@ function updateColorCycling() {
       CGRAM[end * 2 + 1] = savedHi;
     }
   }
+  markCGRAMDirty();
 }
 
 // ============================================================
@@ -826,7 +828,7 @@ function renderFrame() {
     renderSpriteScanline(scanline, lineBuffer, priorityBuffer);
 
     // Mosaic (works on uint32 values directly)
-    applyMosaic(lineBuffer);
+    if (mosaicSize > 1) applyMosaic(lineBuffer);
 
     // Window masking (packed — no object allocation)
     if (doWindow) {
@@ -2217,19 +2219,20 @@ const scenes = [
       m7c = -sinR * 0.25;
 
       // Rebuild HDMA perspective values with current rotation baked in
+      // PERF: pre-compute constants, only loop below horizon
       const m7aValues = hdmaEffects[0].values;
       const m7dValues = hdmaEffects[1].values;
-      for (let i = 0; i < SCREEN_H; i++) {
-        if (i < horizonLine) {
-          m7aValues[i] = 0.05 * cosR;
-          m7dValues[i] = 0.05 * cosR;
-        } else {
-          const distFromHorizon = i - horizonLine + 1;
-          const maxDist = SCREEN_H - horizonLine;
-          const perspectiveScale = (maxDist / distFromHorizon) * 0.15;
-          m7aValues[i] = perspectiveScale * cosR;
-          m7dValues[i] = perspectiveScale * cosR;
-        }
+      const aboveHorizonVal = 0.05 * cosR;
+      const maxDist = SCREEN_H - horizonLine;
+      const scaleFactor = maxDist * 0.15 * cosR;
+      for (let i = 0; i < horizonLine; i++) {
+        m7aValues[i] = aboveHorizonVal;
+        m7dValues[i] = aboveHorizonVal;
+      }
+      for (let i = horizonLine; i < SCREEN_H; i++) {
+        const val = scaleFactor / (i - horizonLine + 1);
+        m7aValues[i] = val;
+        m7dValues[i] = val;
       }
 
       // Scroll forward into the plane
@@ -2306,12 +2309,15 @@ const scenes = [
       bgScrollY[1] = Math.floor(Math.cos(localFrame * 0.0006) * 4);
 
       // Animate the HDMA wave — shift phase over time for undulating aurora bands
+      // PERF: sinLUT replaces Math.sin (448 calls/frame → 448 LUT lookups)
       if (hdmaEffects.length >= 2) {
         const vals0 = hdmaEffects[0].values;
         const vals1 = hdmaEffects[1].values;
+        const phase0 = localFrame * 0.005;
+        const phase1 = localFrame * 0.004;
         for (let i = 0; i < SCREEN_H; i++) {
-          vals0[i] = Math.sin(i * 0.03 + localFrame * 0.005) * 10;
-          vals1[i] = -Math.sin(i * 0.025 + localFrame * 0.004) * 8;
+          vals0[i] = sinLUT(i * 0.03 + phase0) * 10;
+          vals1[i] = -sinLUT(i * 0.025 + phase1) * 8;
         }
       }
 
@@ -2485,12 +2491,16 @@ const scenes = [
       if (localFrame % 12 === 0) bgScrollY[1] -= 1;
 
       // Animate the HDMA wave for living water distortion
+      // PERF: sinLUT replaces Math.sin (448 calls/frame → LUT lookups)
       if (hdmaEffects.length >= 2) {
         const vals0 = hdmaEffects[0].values;
         const vals1 = hdmaEffects[1].values;
+        const phase0 = localFrame * 0.008;
+        const phase1 = localFrame * 0.003;
         for (let i = 0; i < SCREEN_H; i++) {
-          vals0[i] = Math.sin(i * 0.04 + localFrame * 0.008) * 6 + Math.sin(i * 0.08 + localFrame * 0.003) * 3;
-          vals1[i] = vals0[i] * 0.6;
+          const v = sinLUT(i * 0.04 + phase0) * 6 + sinLUT(i * 0.08 + phase1) * 3;
+          vals0[i] = v;
+          vals1[i] = v * 0.6;
         }
       }
 
@@ -2873,12 +2883,15 @@ const scenes = [
       window2Right = Math.floor(cx + Math.cos(phase2 * 0.8 + 1) * 60);
 
       // Animate HDMA for per-scanline window displacement
+      // PERF: sinLUT/cosLUT replaces Math.sin/cos (448 calls/frame → LUT lookups)
       if (hdmaEffects.length >= 2) {
         const w1 = hdmaEffects[0].values;
         const w2 = hdmaEffects[1].values;
+        const phase1 = localFrame * 0.006;
+        const phase2 = localFrame * 0.005;
         for (let i = 0; i < SCREEN_H; i++) {
-          w1[i] = Math.floor(cx + Math.sin(i * 0.03 + localFrame * 0.006) * 70);
-          w2[i] = Math.floor(cx + Math.cos(i * 0.04 + localFrame * 0.005) * 50);
+          w1[i] = (cx + sinLUT(i * 0.03 + phase1) * 70) | 0;
+          w2[i] = (cx + cosLUT(i * 0.04 + phase2) * 50) | 0;
         }
       }
 

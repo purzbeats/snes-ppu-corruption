@@ -64,3 +64,27 @@ branching and redundant multiplication.
 
 Replaced `getCGRAMColor(0, colorIdx)` function call with direct `cgramCache[colorIdx & 0xFF]`
 array access in the Mode 7 per-pixel loop (256 × 224 = 57,344 calls/frame when Mode 7 active).
+
+## 2026-03-25 — Renderer overhaul and social media export
+
+Complete rewrite of the offline renderer with frame-perfect capture and social media support.
+
+### Sequence builder (`render.html`)
+
+Added multi-scene sequence mode: queue scenes with individual durations, configurable fade-to-black transitions between them. Renders the full sequence as a single video.
+
+### Instagram / social media compatibility (`render.html`, `encode.bat`)
+
+MP4 exports now include a silent audio track and use H.264 Main profile with `movflags +faststart` — required by Instagram, TikTok, and Twitter. Added resolution presets for social formats: 1080x1080 (Instagram square), 1080x1920 (Reels/TikTok), 1080p, and 4K.
+
+### ffmpeg encoding script (`encode.bat`)
+
+New batch script for encoding PNG frame sequences with pixel-art-optimized settings. Produces HQ (yuv444p CRF 10), social-ready (yuv420p + silent audio + Main profile), and optional lossless outputs. Preset switched from `veryslow` to `medium` for 5-10x faster encodes.
+
+### Renderer fixes
+
+- Fixed frame timing: simulate at native 60fps, capture at output fps (4 sim ticks per rendered frame at 15fps, etc.)
+- Frame-perfect PNG export with synchronous pixel capture
+- Fixed corrupt ZIP files by adding CRC-32 checksums to PNG frame export
+- Fixed stretched pixels: integer-scale with black bars, always square pixels
+- Renderer extends PPU dimensions to fill target aspect ratio

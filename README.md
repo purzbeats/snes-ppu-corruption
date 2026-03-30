@@ -2,7 +2,7 @@
 
 Generative art engine that simulates the Super Nintendo PPU at the bit level, then applies controlled corruption algorithms to create evolving abstract visuals. 38 scenes, 21 glitch algorithms, 10 landscape biomes, 8 tile morph phases. Runs entirely in the browser — no dependencies, no build step.
 
-Built for CRT art installations with PS5 controller input.
+Built for CRT art installations with controller input.
 
 <p align="center">
   <img src="docs/screenshots/cathedral.png" width="256" alt="CATHEDRAL — stained glass patterns">
